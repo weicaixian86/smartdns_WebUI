@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::env;
+use std::fs;
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -99,8 +100,86 @@ fn link_smartdns_lib() {
     }
 }
 
+fn directive_kind_from_macro(macro_name: &str) -> &'static str {
+    match macro_name {
+        "YESNO" | "YESNO_FUNC" => "boolean",
+        "INT" | "INT_FUNC" | "INT_BASE" | "INT_BASE_FUNC" => "integer",
+        "STRING" | "STRING_FUNC" => "string",
+        "SIZE" | "SIZE_FUNC" | "SSIZE" | "SSIZE_FUNC" => "size",
+        "ENUM" | "ENUM_FUNC" => "enum",
+        "CUSTOM" => "custom",
+        _ => "custom",
+    }
+}
+
+fn generate_smartdns_conf_schema() {
+    let curr_source_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let smartdns_conf_file = format!("{}/../../src/dns_conf/dns_conf.c", curr_source_dir);
+    println!("cargo:rerun-if-changed={}", smartdns_conf_file);
+
+    let source = fs::read_to_string(&smartdns_conf_file).expect("Unable to read dns_conf.c");
+    let mut output = String::from(
+        "pub static SMARTDNS_CONFIG_DIRECTIVE_SCHEMA: &[SmartdnsConfigDirectiveSchema] = &[\n",
+    );
+
+    let mut in_config_items = false;
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("static struct config_item _config_item[] = {") {
+            in_config_items = true;
+            continue;
+        }
+
+        if !in_config_items {
+            continue;
+        }
+
+        if trimmed.starts_with("};") {
+            break;
+        }
+
+        if !trimmed.starts_with("CONF_") {
+            continue;
+        }
+
+        if trimmed.starts_with("CONF_END") {
+            continue;
+        }
+
+        let macro_start = "CONF_".len();
+        let Some(paren_index) = trimmed.find('(') else {
+            continue;
+        };
+        let macro_name = &trimmed[macro_start..paren_index];
+
+        let Some(first_quote) = trimmed.find('"') else {
+            continue;
+        };
+        let directive_start = first_quote + 1;
+        let Some(second_quote_rel) = trimmed[directive_start..].find('"') else {
+            continue;
+        };
+        let directive_end = directive_start + second_quote_rel;
+        let directive_name = &trimmed[directive_start..directive_end];
+        let directive_kind = directive_kind_from_macro(macro_name);
+
+        output.push_str("    SmartdnsConfigDirectiveSchema {\n");
+        output.push_str(&format!("        name: {:?},\n", directive_name));
+        output.push_str(&format!("        kind: {:?},\n", directive_kind));
+        output.push_str(&format!("        source_macro: {:?},\n", macro_name));
+        output.push_str("    },\n");
+    }
+
+    output.push_str("];\n");
+
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    fs::write(out_path.join("smartdns_conf_schema.rs"), output)
+        .expect("Couldn't write smartdns config schema");
+}
+
 fn main() {
     get_git_commit_version();
     link_smartdns_lib();
+    generate_smartdns_conf_schema();
     link_rename_lib();
 }

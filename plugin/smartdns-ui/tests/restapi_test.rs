@@ -22,6 +22,7 @@ use common::TestDnsRequest;
 use nix::libc::c_char;
 use smartdns_ui::{http_api_msg, http_jwt::JwtClaims, smartdns::LogLevel};
 use std::ffi::CString;
+use std::fs;
 
 #[test]
 fn test_rest_api_login() {
@@ -461,6 +462,81 @@ fn test_rest_api_settings() {
     let settings = settings.unwrap();
     assert_eq!(settings.len(), 7);
     assert_eq!(settings["key1"], "value1");
+}
+
+#[test]
+fn test_rest_api_smartdns_conf_file() {
+    let temp_dir = tempfile::TempDir::with_prefix("smartdns-ui-conf-file-").unwrap();
+    let conf_file = temp_dir.path().join("smartdns.conf");
+    fs::write(&conf_file, "bind :6053\ncache-size 1024\n").unwrap();
+
+    let mut server = common::TestServer::new();
+    server.set_log_level(LogLevel::DEBUG);
+    server.add_args(vec![
+        "--conf-file".to_string(),
+        conf_file.to_string_lossy().to_string(),
+    ]);
+    assert!(server.start().is_ok());
+
+    let mut client = common::TestClient::new(&server.get_host());
+    let res = client.login("admin", "password");
+    assert!(res.is_ok());
+
+    let c = client.get("/api/config/smartdns/file");
+    assert!(c.is_ok());
+    let (code, body) = c.unwrap();
+    assert_eq!(code, 200);
+
+    let config_file = http_api_msg::api_msg_parse_smartdns_conf_file(&body);
+    assert!(config_file.is_ok());
+    let config_file = config_file.unwrap();
+    assert_eq!(config_file.path, conf_file.to_string_lossy().to_string());
+    assert!(config_file.content.contains("bind :6053"));
+
+    let body = serde_json::json!({
+        "content": "bind :6054\ncache-size 2048\n"
+    })
+    .to_string();
+    let c = client.put("/api/config/smartdns/file", body.as_str());
+    assert!(c.is_ok());
+    let (code, _) = c.unwrap();
+    assert_eq!(code, 204);
+
+    let content = fs::read_to_string(&conf_file).unwrap();
+    assert_eq!(content, "bind :6054\ncache-size 2048\n");
+    assert!(conf_file.with_extension("conf.bak").exists());
+}
+
+#[test]
+fn test_rest_api_smartdns_conf_schema() {
+    let mut server = common::TestServer::new();
+    server.set_log_level(LogLevel::DEBUG);
+    assert!(server.start().is_ok());
+
+    let mut client = common::TestClient::new(&server.get_host());
+    let res = client.login("admin", "password");
+    assert!(res.is_ok());
+
+    let c = client.get("/api/config/smartdns/schema");
+    assert!(c.is_ok());
+    let (code, body) = c.unwrap();
+    assert_eq!(code, 200);
+
+    let schema: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert!(schema["directive_count"].as_u64().unwrap() > 50);
+    let directives = schema["directives"].as_array().unwrap();
+    assert!(directives
+        .iter()
+        .any(|item| item["name"].as_str() == Some("bind")));
+    assert!(directives
+        .iter()
+        .any(|item| item["name"].as_str() == Some("server-https")));
+    assert!(directives
+        .iter()
+        .any(|item| item["name"].as_str() == Some("conf-file")));
+    assert!(directives
+        .iter()
+        .any(|item| item["name"].as_str() == Some("smartdns-ui.password")));
 }
 
 #[test]

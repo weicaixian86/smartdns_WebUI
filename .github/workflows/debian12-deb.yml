@@ -1,0 +1,85 @@
+name: Debian 12 amd64 Deb Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-debian12-deb:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:12
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential \
+            ca-certificates \
+            clang \
+            curl \
+            dpkg-dev \
+            file \
+            git \
+            libclang-dev \
+            libssl-dev \
+            make \
+            pkg-config \
+            unzip \
+            wget \
+            xz-utils
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Prepare build metadata
+        id: meta
+        shell: bash
+        run: |
+          build_no="${{ github.run_number }}"
+          build_date="$(TZ=Asia/Shanghai date +%Y.%m.%d)"
+          version="${build_no}.${build_date}"
+          deb_name="smartdns.${version}.amd64-debian-all.deb"
+
+          echo "build_no=${build_no}" >> "$GITHUB_OUTPUT"
+          echo "build_date=${build_date}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "deb_name=${deb_name}" >> "$GITHUB_OUTPUT"
+
+      - name: Build Debian 12 amd64 package
+        shell: bash
+        run: |
+          mkdir -p dist
+          chmod +x package/build-pkg.sh
+          ./package/build-pkg.sh \
+            --platform debian \
+            --arch amd64 \
+            --filearch amd64-debian-all \
+            --ver "${{ steps.meta.outputs.version }}" \
+            --with-ui \
+            --outputdir "$PWD/dist"
+          test -f "dist/${{ steps.meta.outputs.deb_name }}"
+          ls -lah dist
+
+      - name: Upload Debian package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.deb_name }}
+          path: dist/${{ steps.meta.outputs.deb_name }}
+          if-no-files-found: error

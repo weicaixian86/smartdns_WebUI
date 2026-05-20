@@ -10,6 +10,8 @@ OUTPUTDIR=$CURR_DIR
 SMARTDNS_WEBUI_URL="https://github.com/pymumu/smartdns-webui/archive/refs/heads/main.zip"
 SMARTDNS_WEBUI_SOURCE="$WORKDIR/smartdns-webui"
 SMARTDNS_STATIC_DIR="$WORKDIR/smartdns-static"
+SMARTDNS_WEBUI_LOCAL_SOURCE="$CODE_DIR/../smartdns-webui"
+SMARTDNS_WEBUI_OVERLAY_DIR="$CODE_DIR/package/webui-overlay"
 SMARTDNS_WITH_LIBS=0
 MAKE_NJOBS=1
 
@@ -263,26 +265,31 @@ build_smartdns()
 
 build_webpages()
 {
-	if [ ! -f "$WORKDIR/smartdns-webui.zip" ]; then
-		echo "smartdns-webui source not found, downloading..."
-		wget -O $WORKDIR/smartdns-webui.zip $SMARTDNS_WEBUI_URL
-		if [ $? -ne 0 ]; then
-			echo "Failed to download smartdns-webui source at $SMARTDNS_WEBUI_URL"
-			return 1
+	if [ -d "$SMARTDNS_WEBUI_LOCAL_SOURCE" ] && [ -f "$SMARTDNS_WEBUI_LOCAL_SOURCE/package.json" ]; then
+		echo "Using local smartdns-webui source: $SMARTDNS_WEBUI_LOCAL_SOURCE"
+		SMARTDNS_WEBUI_SOURCE="$SMARTDNS_WEBUI_LOCAL_SOURCE"
+	else
+		if [ ! -f "$WORKDIR/smartdns-webui.zip" ]; then
+			echo "smartdns-webui source not found, downloading..."
+			wget -O $WORKDIR/smartdns-webui.zip $SMARTDNS_WEBUI_URL
+			if [ $? -ne 0 ]; then
+				echo "Failed to download smartdns-webui source at $SMARTDNS_WEBUI_URL"
+				return 1
+			fi
 		fi
-	fi
 
-	if [ ! -d "$SMARTDNS_WEBUI_SOURCE" ]; then
-		echo "smartdns-webui source not found, unzipping..."
-		unzip -q $WORKDIR/smartdns-webui.zip -d $WORKDIR
-		if [ $? -ne 0 ]; then
-			echo "Failed to unzip smartdns-webui source."
-			return 1
-		fi
-		mv $WORKDIR/smartdns-webui-main $SMARTDNS_WEBUI_SOURCE
-		if [ $? -ne 0 ]; then
-			echo "Failed to rename smartdns-webui directory."
-			return 1
+		if [ ! -d "$SMARTDNS_WEBUI_SOURCE" ]; then
+			echo "smartdns-webui source not found, unzipping..."
+			unzip -q $WORKDIR/smartdns-webui.zip -d $WORKDIR
+			if [ $? -ne 0 ]; then
+				echo "Failed to unzip smartdns-webui source."
+				return 1
+			fi
+			mv $WORKDIR/smartdns-webui-main $SMARTDNS_WEBUI_SOURCE
+			if [ $? -ne 0 ]; then
+				echo "Failed to rename smartdns-webui directory."
+				return 1
+			fi
 		fi
 	fi
 
@@ -294,6 +301,16 @@ build_webpages()
 	if [ ! -f "$SMARTDNS_WEBUI_SOURCE/package.json" ]; then
 		echo "smartdns-webui source is not valid."
 		return 1
+	fi
+
+	if [ -d "$SMARTDNS_WEBUI_OVERLAY_DIR" ]; then
+		echo "Applying smartdns-webui overlay from $SMARTDNS_WEBUI_OVERLAY_DIR"
+		cp -af $SMARTDNS_WEBUI_OVERLAY_DIR/. $SMARTDNS_WEBUI_SOURCE/
+		if [ $? -ne 0 ]; then
+			echo "Failed to apply smartdns-webui overlay."
+			return 1
+		fi
+		rm -fr "$SMARTDNS_WEBUI_SOURCE/out"
 	fi
 
 	if [ -f "$SMARTDNS_WEBUI_SOURCE/out/index.html" ]; then

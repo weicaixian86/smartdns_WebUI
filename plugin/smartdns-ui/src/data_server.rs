@@ -33,6 +33,8 @@ use crate::whois::WhoIsInfo;
 
 use std::collections::HashMap;
 use std::error::Error;
+use std::fs;
+use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use std::sync::Weak;
 use std::sync::{Arc, Mutex, RwLock};
@@ -43,6 +45,7 @@ use tokio::time::Instant;
 
 pub const DEFAULT_MAX_LOG_AGE: u64 = 30 * 24 * 60 * 60;
 pub const DEFAULT_MAX_LOG_AGE_MS: u64 = DEFAULT_MAX_LOG_AGE * 1000;
+pub const DEFAULT_SMARTDNS_CONF_FILE: &str = "/etc/smartdns/smartdns.conf";
 pub const MAX_LOG_AGE_VALUE_MIN: u64 = 600;
 pub const MAX_LOG_AGE_VALUE_MAX: u64 = 365 * 24 * 60 * 60 * 10;
 pub const MIN_FREE_DISK_SPACE: u64 = 1024 * 1024 * 8;
@@ -77,6 +80,7 @@ pub struct DataServerConfig {
     pub db_file: String,
     pub data_path: String,
     pub max_log_age_ms: u64,
+    pub smartdns_conf_file: String,
 }
 
 impl DataServerConfig {
@@ -85,6 +89,7 @@ impl DataServerConfig {
             data_path: Plugin::dns_conf_data_dir(),
             db_file: Plugin::dns_conf_data_dir() + "/" + DB_FILE_NAME,
             max_log_age_ms: DEFAULT_MAX_LOG_AGE_MS,
+            smartdns_conf_file: DEFAULT_SMARTDNS_CONF_FILE.to_string(),
         }
     }
 
@@ -365,6 +370,10 @@ impl DataServer {
         conf.clone()
     }
 
+    pub fn get_smartdns_conf_file(&self) -> String {
+        self.conf.read().unwrap().smartdns_conf_file.clone()
+    }
+
     pub fn get_config(&self, key: &str) -> Option<String> {
         let ret = self.db.get_config(key);
         if let Ok(value) = ret {
@@ -407,6 +416,39 @@ impl DataServer {
 
     pub fn set_config(&self, key: &str, value: &str) -> Result<(), Box<dyn Error>> {
         self.db.set_config(key, value)
+    }
+
+    pub fn read_smartdns_conf(&self) -> Result<(String, String), Box<dyn Error>> {
+        let conf_file = self.get_smartdns_conf_file();
+        let content = if Path::new(&conf_file).exists() {
+            fs::read_to_string(&conf_file)?
+        } else {
+            String::new()
+        };
+        Ok((conf_file, content))
+    }
+
+    pub fn write_smartdns_conf(&self, content: &str) -> Result<String, Box<dyn Error>> {
+        let conf_file = self.get_smartdns_conf_file();
+        let conf_path = Path::new(&conf_file);
+
+        if let Some(parent) = conf_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        if conf_path.exists() {
+            let backup_file = format!("{}.bak", conf_file);
+            fs::copy(&conf_file, backup_file)?;
+        }
+
+        let temp_file = format!("{}.ui.tmp", conf_file);
+        fs::write(&temp_file, content)?;
+        if conf_path.exists() {
+            fs::remove_file(&conf_file)?;
+        }
+        fs::rename(&temp_file, &conf_file)?;
+
+        Ok(conf_file)
     }
 
     pub fn get_upstream_server_list(&self) -> Result<Vec<UpstreamServerInfo>, Box<dyn Error>> {

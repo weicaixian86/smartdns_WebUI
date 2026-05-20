@@ -29,6 +29,7 @@ pub mod http_server_stream;
 pub mod plugin;
 pub mod server_log;
 pub mod smartdns;
+pub mod smartdns_conf;
 pub mod utils;
 pub mod whois;
 

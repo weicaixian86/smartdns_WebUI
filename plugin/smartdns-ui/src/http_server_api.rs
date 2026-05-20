@@ -24,6 +24,7 @@ use crate::http_jwt::*;
 use crate::http_server::*;
 use crate::http_server_stream;
 use crate::smartdns;
+use crate::smartdns_conf;
 use crate::smartdns::*;
 use crate::utils;
 use crate::Plugin;
@@ -98,6 +99,9 @@ impl API {
         api.register(Method::GET, "/api/upstream-server", true, APIRoute!(API::api_upstream_server_get_list));
         api.register(Method::GET, "/api/config/settings", true, APIRoute!(API::api_config_get_settings));
         api.register(Method::PUT, "/api/config/settings", true, APIRoute!(API::api_config_set_settings));
+        api.register(Method::GET, "/api/config/smartdns/file", true, APIRoute!(API::api_config_smartdns_get_file));
+        api.register(Method::PUT, "/api/config/smartdns/file", true, APIRoute!(API::api_config_smartdns_set_file));
+        api.register(Method::GET, "/api/config/smartdns/schema", true, APIRoute!(API::api_config_smartdns_get_schema));
         api.register(Method::GET, "/api/stats/top/client", true, APIRoute!(API::api_stats_get_top_client));
         api.register(Method::GET, "/api/stats/top/domain", true, APIRoute!(API::api_stats_get_top_domain));
         api.register(Method::GET, "/api/stats/metrics", true, APIRoute!(API::api_stats_get_metrics));
@@ -997,6 +1001,53 @@ impl API {
         }
 
         API::response_build(StatusCode::NO_CONTENT, "".to_string())
+    }
+
+    async fn api_config_smartdns_get_file(
+        this: Arc<HttpServer>,
+        _param: APIRouteParam,
+        _req: Request<body::Incoming>,
+    ) -> Result<Response<Full<Bytes>>, HttpError> {
+        let data_server = this.get_data_server();
+        let conf_file = data_server.read_smartdns_conf();
+        if let Err(e) = conf_file {
+            return API::response_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string().as_str());
+        }
+
+        let (path, content) = conf_file.unwrap();
+        let body = api_msg_gen_smartdns_conf_file(path.as_str(), content.as_str());
+        API::response_build(StatusCode::OK, body)
+    }
+
+    async fn api_config_smartdns_set_file(
+        this: Arc<HttpServer>,
+        _param: APIRouteParam,
+        req: Request<body::Incoming>,
+    ) -> Result<Response<Full<Bytes>>, HttpError> {
+        let data_server = this.get_data_server();
+        let whole_body = String::from_utf8(req.into_body().collect().await?.to_bytes().into())?;
+        let content = api_msg_parse_smartdns_conf_file_content(whole_body.as_str());
+        if let Err(e) = content {
+            return API::response_error(StatusCode::BAD_REQUEST, e.to_string().as_str());
+        }
+
+        let ret = data_server.write_smartdns_conf(content.unwrap().as_str());
+        if let Err(e) = ret {
+            return API::response_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string().as_str());
+        }
+
+        API::response_build(StatusCode::NO_CONTENT, "".to_string())
+    }
+
+    async fn api_config_smartdns_get_schema(
+        this: Arc<HttpServer>,
+        _param: APIRouteParam,
+        _req: Request<body::Incoming>,
+    ) -> Result<Response<Full<Bytes>>, HttpError> {
+        let directives = smartdns_conf::get_all_smartdns_config_schema();
+        let path = this.get_data_server().get_smartdns_conf_file();
+        let body = api_msg_gen_smartdns_conf_schema(path.as_str(), directives.as_slice());
+        API::response_build(StatusCode::OK, body)
     }
 
     async fn api_stats_get_top_client(

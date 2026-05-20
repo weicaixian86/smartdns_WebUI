@@ -20,6 +20,7 @@ use crate::data_server::*;
 use crate::data_upstream_server::UpstreamServerInfo;
 use crate::db::*;
 use crate::smartdns::LogLevel;
+use crate::smartdns_conf::SmartdnsConfigDirectiveSchema;
 use crate::whois::WhoIsInfo;
 use serde_json::json;
 use std::collections::HashMap;
@@ -35,6 +36,12 @@ pub struct AuthUser {
 pub struct TokenResponse {
     pub token: String,
     pub expires_in: String,
+}
+
+#[derive(Debug)]
+pub struct SmartdnsConfigFileResponse {
+    pub path: String,
+    pub content: String,
 }
 
 pub fn api_msg_parse_auth(data: &str) -> Result<AuthUser, Box<dyn Error>> {
@@ -571,6 +578,62 @@ pub fn api_msg_parse_key_value(data: &str) -> Result<HashMap<String, String>, Bo
     }
 
     Ok(conf_map)
+}
+
+pub fn api_msg_gen_smartdns_conf_file(path: &str, content: &str) -> String {
+    json!({
+        "path": path,
+        "content": content,
+    })
+    .to_string()
+}
+
+pub fn api_msg_parse_smartdns_conf_file(
+    data: &str,
+) -> Result<SmartdnsConfigFileResponse, Box<dyn Error>> {
+    let v: serde_json::Value = serde_json::from_str(data)?;
+    let path = v["path"].as_str();
+    if path.is_none() {
+        return Err("path not found".into());
+    }
+
+    let content = v["content"].as_str();
+    if content.is_none() {
+        return Err("content not found".into());
+    }
+
+    Ok(SmartdnsConfigFileResponse {
+        path: path.unwrap().to_string(),
+        content: content.unwrap().to_string(),
+    })
+}
+
+pub fn api_msg_parse_smartdns_conf_file_content(data: &str) -> Result<String, Box<dyn Error>> {
+    let v: serde_json::Value = serde_json::from_str(data)?;
+    let content = v["content"].as_str();
+    if content.is_none() {
+        return Err("content not found".into());
+    }
+
+    Ok(content.unwrap().to_string())
+}
+
+pub fn api_msg_gen_smartdns_conf_schema(
+    path: &str,
+    directives: &[SmartdnsConfigDirectiveSchema],
+) -> String {
+    json!({
+        "path": path,
+        "directive_count": directives.len(),
+        "directives": directives.iter().map(|directive| {
+            json!({
+                "name": directive.name,
+                "kind": directive.kind,
+                "source_macro": directive.source_macro,
+            })
+        }).collect::<Vec<serde_json::Value>>(),
+    })
+    .to_string()
 }
 
 pub fn api_msg_gen_top_client_list(client_list: &Vec<ClientQueryCount>) -> String {
