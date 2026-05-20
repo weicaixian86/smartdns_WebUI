@@ -2,9 +2,9 @@ name: Debian 12 amd64 Deb Build
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, new_settings ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, new_settings ]
   workflow_dispatch:
 
 permissions:
