@@ -1,4 +1,4 @@
-# SmartDNS WebUI Settings Extension
+# SmartDNS WebUI 设置说明。
 
 ![UI 截图](png/1.png)
 
