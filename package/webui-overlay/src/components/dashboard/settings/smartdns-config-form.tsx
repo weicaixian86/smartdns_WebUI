@@ -76,42 +76,42 @@ const CATEGORY_DEFINITIONS: DirectiveCategory[] = [
   {
     id: 'basic',
     title: '基础配置',
-    description: '服务名称、监听地址、运行用户和基础运行行为。',
+    description: '常用配置：监听、上游、缓存策略与日志级别。',
   },
   {
     id: 'upstream',
     title: '上游 DNS',
-    description: '上游 DNS 服务器、TLS/HTTPS/QUIC、代理和证书相关配置。',
+    description: '扩展上游 DNS、DoT/DoH/DoQ、代理与证书设置。',
   },
   {
     id: 'cache',
     title: '缓存与应答',
-    description: '缓存大小、过期应答、TTL 和返回策略。',
+    description: '缓存容量、过期应答、TTL 与返回策略。',
   },
   {
     id: 'logging',
     title: '日志与审计',
-    description: '日志级别、日志文件、审计文件和调试项。',
+    description: '日志级别、日志文件、审计文件与调试开关。',
   },
   {
     id: 'domainRules',
     title: '域名与分组规则',
-    description: '域名路由、地址映射、规则组、客户端规则等。',
+    description: '域名分流、地址映射、规则组与客户端规则。',
   },
   {
     id: 'ipRules',
     title: 'IP 规则与集合',
-    description: '黑白名单、IPSet、NFTSet、IP 别名和 ECS。',
+    description: '黑白名单、IPSet、NFTSet、IP 别名与 ECS。',
   },
   {
     id: 'advanced',
     title: '高级设置',
-    description: '双栈优选、DNS64、本地解析、证书文件和插件。',
+    description: '运行方式、双栈优选、DNS64、本地解析和插件。',
   },
   {
     id: 'webui',
     title: 'WebUI 插件',
-    description: '6080 管理界面的地址、账号、CORS 和终端开关。',
+    description: '6080 管理界面的地址、账号、CORS 与终端开关。',
   },
   {
     id: 'other',
@@ -319,17 +319,372 @@ const placeholders: Record<string, string> = {
 };
 
 const helperTexts: Record<string, string> = {
-  bind: '支持添加多个监听地址，每行一条。',
-  'bind-tcp': '支持添加多个 TCP 监听地址，每行一条。',
-  server: '可添加多个上游 UDP/DoH 地址，每行一条。',
-  'server-tls': '可添加多个 DoT 地址，每行一条。',
-  'server-https': '可添加多个 DoH 地址，每行一条。',
-  'server-quic': '可添加多个 DoQ 地址，每行一条。',
-  plugin: '插件按行添加，测试 UI 时通常保留 smartdns_ui.so。',
-  'smartdns-ui.ip': '填写 WebUI 监听地址，测试时常用 http://0.0.0.0:6080。',
-  'smartdns-ui.password': '这里填写 WebUI 登录密码明文，插件会在服务端处理。',
-  'response-mode': '请选择返回给客户端的 IP 选择策略。',
-  'log-level': '请选择日志输出级别。',
+  'server-name': '用于标识当前 SmartDNS 服务名称。',
+  bind: 'UDP 监听地址，可按行添加多个地址。',
+  'bind-tcp': 'TCP 监听地址，可按行添加多个地址。',
+  'bind-tls': 'TLS 监听地址，启用时需配合证书参数。',
+  'bind-https': 'HTTPS 监听地址，启用时需配合证书参数。',
+  server: '上游 DNS 列表，SmartDNS 至少需要一个可用上游。',
+  'server-tcp': 'TCP 上游 DNS 列表，可按行添加。',
+  'server-tls': 'TLS 上游 DNS 列表，可按行添加。',
+  'server-https': 'HTTPS 上游 DNS 列表，可按行添加。',
+  'server-h3': 'HTTP/3 上游 DNS 列表，可按行添加。',
+  'server-http3': 'HTTP/3 上游 DNS 列表，可按行添加。',
+  'server-quic': 'QUIC 上游 DNS 列表，可按行添加。',
+  'proxy-server': '代理服务器定义，供上游 DNS 通过代理访问。',
+  'cache-size': 'DNS 缓存条目数量，0 表示关闭缓存。',
+  'cache-mem-size': '限制缓存可使用的内存大小。',
+  'cache-persist': '重启后是否保留缓存内容。',
+  'cache-checkpoint-time': '缓存落盘周期，单位为秒。',
+  'prefetch-domain': '提前刷新热点域名缓存，减少过期等待。',
+  'serve-expired': '缓存过期时继续返回旧结果，并后台刷新。',
+  'serve-expired-ttl': '缓存过期结果允许继续使用的时长。',
+  'serve-expired-reply-ttl': '返回过期缓存时对客户端展示的 TTL。',
+  'serve-expired-prefetch-time': '缓存即将过期前提前刷新时机。',
+  'response-mode': '控制 SmartDNS 对客户端返回 IP 的优选策略。',
+  'log-level': '设置 SmartDNS 的日志输出级别。',
+  'log-file': '日志文件路径，启用后会写入磁盘。',
+  'audit-enable': '开启后记录 DNS 审计日志。',
+  nameserver: '按域名或规则指定上游 DNS 服务器组。',
+  address: '按域名返回固定地址或屏蔽结果。',
+  cname: '为域名返回固定 CNAME 结果。',
+  'domain-rules': '按域名批量应用规则，保持原生 SmartDNS 语法。',
+  'group-begin': '定义规则组起始，通常与 group-end 配对使用。',
+  'group-end': '结束当前规则组定义。',
+  'group-match': '按条件匹配到特定规则组。',
+  'client-rules': '按客户端来源地址或 MAC 套用规则。',
+  ipset: '将命中域名结果写入 IPSet。',
+  nftset: '将命中域名结果写入 NFTSet。',
+  'blacklist-ip': '过滤掉不可信或不希望返回的 IP。',
+  'whitelist-ip': '仅放行白名单中的 IP 结果。',
+  'edns-client-subnet': '向上游附带 ECS 信息，提升地域解析准确性。',
+  'dualstack-ip-selection': '双栈网络下是否启用 IPv4/IPv6 优选。',
+  'speed-check-mode': '定义 SmartDNS 的测速与优选方式。',
+  plugin: '插件按行添加；若要继续使用 6080 管理页，请保留 smartdns_ui.so。',
+  'smartdns-ui.conf-file': 'WebUI 读写的 SmartDNS 主配置文件路径。',
+  'smartdns-ui.www-root': 'WebUI 静态页面目录，通常无需改动。',
+  'smartdns-ui.ip': 'WebUI 监听地址，测试时常用 http://0.0.0.0:6080。',
+  'smartdns-ui.token-expire': 'WebUI 登录令牌过期时间，单位为秒。',
+  'smartdns-ui.max-query-log-age': '查询日志的最大保留秒数。',
+  'smartdns-ui.enable-terminal': '是否允许在 WebUI 中使用终端功能。',
+  'smartdns-ui.enable-cors': '是否允许跨域访问 WebUI API。',
+  'smartdns-ui.user': 'WebUI 登录用户名。',
+  'smartdns-ui.password': '填写 WebUI 登录密码明文，插件会在服务端处理。',
+};
+
+const basicCommonDirectives = new Set<string>([
+  'server-name',
+  'resolv-hostname',
+  'user',
+  'bind',
+  'bind-tcp',
+  'server',
+  'cache-size',
+  'prefetch-domain',
+  'serve-expired',
+  'response-mode',
+  'log-level',
+]);
+
+const directiveOrderByCategory: Record<string, string[]> = {
+  basic: [
+    'server-name',
+    'bind',
+    'bind-tcp',
+    'server',
+    'response-mode',
+    'cache-size',
+    'prefetch-domain',
+    'serve-expired',
+    'log-level',
+    'resolv-hostname',
+    'user',
+  ],
+  upstream: [
+    'server-tcp',
+    'server-tls',
+    'server-https',
+    'server-h3',
+    'server-http3',
+    'server-quic',
+    'proxy-server',
+    'ca-file',
+    'ca-path',
+  ],
+  cache: [
+    'cache-size',
+    'cache-mem-size',
+    'cache-persist',
+    'cache-file',
+    'cache-checkpoint-time',
+    'prefetch-domain',
+    'serve-expired',
+    'serve-expired-ttl',
+    'serve-expired-reply-ttl',
+    'serve-expired-prefetch-time',
+    'rr-ttl',
+    'rr-ttl-min',
+    'rr-ttl-max',
+    'rr-ttl-reply-max',
+    'local-ttl',
+    'max-reply-ip-num',
+    'max-query-limit',
+    'response-mode',
+  ],
+  logging: [
+    'log-level',
+    'log-file',
+    'log-size',
+    'log-num',
+    'log-color',
+    'log-console',
+    'log-syslog',
+    'log-file-mode',
+    'audit-enable',
+    'audit-SOA',
+    'audit-file',
+    'audit-file-mode',
+    'audit-size',
+    'audit-num',
+    'audit-console',
+    'audit-syslog',
+    'debug-save-fail-packet',
+    'debug-save-fail-packet-dir',
+  ],
+  domainRules: [
+    'nameserver',
+    'address',
+    'cname',
+    'srv-record',
+    'https-record',
+    'domain-rules',
+    'domain-set',
+    'ddns-domain',
+    'local-domain',
+    'group-begin',
+    'group-match',
+    'group-end',
+    'client-rules',
+  ],
+  ipRules: [
+    'blacklist-ip',
+    'whitelist-ip',
+    'ignore-ip',
+    'bogus-nxdomain',
+    'ip-alias',
+    'ip-rules',
+    'ip-set',
+    'ipset-timeout',
+    'ipset',
+    'ipset-no-speed',
+    'nftset-timeout',
+    'nftset-debug',
+    'nftset',
+    'nftset-no-speed',
+    'edns-client-subnet',
+  ],
+  advanced: [
+    'resolv-hostname',
+    'user',
+    'data-dir',
+    'resolv-file',
+    'tcp-idle-time',
+    'socket-buff-size',
+    'no-pidfile',
+    'no-daemon',
+    'restart-on-crash',
+    'mdns-lookup',
+    'local-ptr-enable',
+    'expand-ptr-from-address',
+    'speed-check-mode',
+    'dualstack-ip-selection',
+    'dualstack-ip-allow-force-AAAA',
+    'dualstack-ip-selection-threshold',
+    'dns64',
+    'force-AAAA-SOA',
+    'force-no-CNAME',
+    'force-qtype-SOA',
+    'dnsmasq-lease-file',
+    'hosts-file',
+    'acl-enable',
+    'bind-cert-root-key-file',
+    'bind-cert-validity-days',
+    'bind-cert-file',
+    'bind-cert-key-file',
+    'bind-cert-key-pass',
+    'plugin',
+    'conf-file',
+  ],
+  webui: [
+    'smartdns-ui.ip',
+    'smartdns-ui.user',
+    'smartdns-ui.password',
+    'smartdns-ui.enable-terminal',
+    'smartdns-ui.enable-cors',
+    'smartdns-ui.conf-file',
+    'smartdns-ui.www-root',
+    'smartdns-ui.token-expire',
+    'smartdns-ui.max-query-log-age',
+  ],
+};
+
+const directiveLabels: Record<string, string> = {
+  'server-name': 'DNS 服务名称',
+  'resolv-hostname': '解析本机主机名',
+  bind: 'UDP 监听地址',
+  'bind-tcp': 'TCP 监听地址',
+  'bind-tls': 'TLS 监听地址',
+  'bind-https': 'HTTPS 监听地址',
+  'tcp-idle-time': 'TCP 空闲超时',
+  'data-dir': '数据目录',
+  user: '运行用户',
+  'no-pidfile': '不写 PID 文件',
+  'no-daemon': '前台运行',
+  'restart-on-crash': '崩溃后重启',
+  'socket-buff-size': 'Socket 缓冲区',
+  'resolv-file': '系统 DNS 文件',
+  server: '上游 DNS',
+  'server-tcp': '上游 TCP DNS',
+  'server-tls': '上游 TLS DNS',
+  'server-https': '上游 HTTPS DNS',
+  'server-h3': '上游 HTTP/3 DNS',
+  'server-http3': '上游 HTTP/3 DNS',
+  'server-quic': '上游 QUIC DNS',
+  'proxy-server': '代理服务器',
+  'ca-file': 'CA 证书文件',
+  'ca-path': 'CA 证书目录',
+  'cache-size': '缓存大小',
+  'cache-mem-size': '缓存内存上限',
+  'cache-file': '缓存文件',
+  'cache-persist': '持久化缓存',
+  'cache-checkpoint-time': '缓存落盘周期',
+  'prefetch-domain': '预取热点域名',
+  'serve-expired': '返回过期缓存',
+  'serve-expired-ttl': '过期缓存保留时长',
+  'serve-expired-reply-ttl': '过期应答 TTL',
+  'serve-expired-prefetch-time': '过期前预取时间',
+  'rr-ttl': '全局 RR TTL',
+  'rr-ttl-min': '最小 RR TTL',
+  'rr-ttl-max': '最大 RR TTL',
+  'rr-ttl-reply-max': '客户端最大回复 TTL',
+  'local-ttl': '本地记录 TTL',
+  'max-reply-ip-num': '最大返回 IP 数',
+  'max-query-limit': '每秒查询上限',
+  'response-mode': '返回策略',
+  'log-level': '日志级别',
+  'log-file': '日志文件',
+  'log-size': '单个日志大小',
+  'log-num': '日志文件数量',
+  'log-color': '彩色日志',
+  'log-console': '控制台日志',
+  'log-syslog': 'Syslog 日志',
+  'log-file-mode': '日志文件权限',
+  'audit-enable': '审计日志',
+  'audit-SOA': '记录 SOA 审计',
+  'audit-file': '审计文件',
+  'audit-file-mode': '审计文件权限',
+  'audit-size': '单个审计文件大小',
+  'audit-num': '审计文件数量',
+  'audit-console': '控制台审计',
+  'audit-syslog': 'Syslog 审计',
+  'debug-save-fail-packet': '保存失败报文',
+  'debug-save-fail-packet-dir': '失败报文目录',
+  nameserver: 'Nameserver 规则',
+  address: '地址映射',
+  cname: 'CNAME 映射',
+  'srv-record': 'SRV 记录',
+  'https-record': 'HTTPS 记录',
+  'domain-rules': '域名规则',
+  'domain-set': '域名集合',
+  'ddns-domain': 'DDNS 域名',
+  'local-domain': '本地域名',
+  'group-begin': '规则组开始',
+  'group-end': '规则组结束',
+  'group-match': '规则组匹配',
+  'client-rules': '客户端规则',
+  'ipset-timeout': 'IPSet 超时',
+  ipset: 'IPSet 写入',
+  'ipset-no-speed': 'IPSet 免测速',
+  'nftset-timeout': 'NFTSet 超时',
+  'nftset-debug': 'NFTSet 调试',
+  nftset: 'NFTSet 写入',
+  'nftset-no-speed': 'NFTSet 免测速',
+  'blacklist-ip': '黑名单 IP',
+  'whitelist-ip': '白名单 IP',
+  'ip-alias': 'IP 别名',
+  'ip-rules': 'IP 规则',
+  'ip-set': 'IP 集合文件',
+  'bogus-nxdomain': 'Bogus NXDOMAIN',
+  'ignore-ip': '忽略 IP',
+  'edns-client-subnet': 'EDNS 客户端子网',
+  'mdns-lookup': 'mDNS 查询',
+  'local-ptr-enable': '本地 PTR 解析',
+  'expand-ptr-from-address': '从地址扩展 PTR',
+  dns64: 'DNS64',
+  'speed-check-mode': '测速模式',
+  'dualstack-ip-selection': '双栈优选',
+  'dualstack-ip-allow-force-AAAA': '允许强制 AAAA',
+  'dualstack-ip-selection-threshold': '双栈优选阈值',
+  'force-AAAA-SOA': '强制 AAAA 返回 SOA',
+  'force-no-CNAME': '禁止 CNAME',
+  'force-qtype-SOA': '强制指定类型返回 SOA',
+  'dnsmasq-lease-file': 'Dnsmasq 租约文件',
+  'hosts-file': 'Hosts 文件',
+  'acl-enable': 'ACL 开关',
+  plugin: '插件列表',
+  'conf-file': '附加配置文件',
+  'bind-cert-root-key-file': '根证书私钥',
+  'bind-cert-validity-days': '证书有效天数',
+  'bind-cert-file': '证书文件',
+  'bind-cert-key-file': '证书私钥文件',
+  'bind-cert-key-pass': '证书私钥密码',
+  'smartdns-ui.conf-file': 'WebUI 配置文件',
+  'smartdns-ui.www-root': 'WebUI 页面目录',
+  'smartdns-ui.ip': 'WebUI 监听地址',
+  'smartdns-ui.token-expire': 'Token 过期秒数',
+  'smartdns-ui.max-query-log-age': '查询日志保留秒数',
+  'smartdns-ui.enable-terminal': '启用网页终端',
+  'smartdns-ui.enable-cors': '启用跨域访问',
+  'smartdns-ui.user': 'WebUI 用户名',
+  'smartdns-ui.password': 'WebUI 密码',
+};
+
+const officialDefaultValues: Record<string, string[]> = {
+  bind: ['[::]:53'],
+  'resolv-hostname': ['yes'],
+  'tcp-idle-time': ['120'],
+  'cache-size': ['-1'],
+  'cache-mem-size': ['-1'],
+  'cache-persist': ['no'],
+  'cache-checkpoint-time': ['86400'],
+  'response-mode': ['first-ping'],
+  'log-level': ['error'],
+  'log-size': ['128k'],
+  'log-num': ['8'],
+  'log-color': ['yes'],
+  'audit-file-mode': ['0640'],
+  'audit-size': ['128k'],
+  'audit-num': ['2'],
+  'local-ptr-enable': ['yes'],
+  'max-query-limit': ['65535'],
+  'resolv-file': ['/etc/resolv.conf'],
+  'debug-save-fail-packet-dir': ['/tmp/smartdns'],
+  'smartdns-ui.conf-file': ['/etc/smartdns/smartdns.conf'],
+  'smartdns-ui.www-root': ['/usr/share/smartdns/wwwroot'],
+  'smartdns-ui.ip': ['http://0.0.0.0:6080'],
+  'smartdns-ui.token-expire': ['600'],
+  'smartdns-ui.max-query-log-age': ['2592000'],
+  'smartdns-ui.enable-terminal': ['no'],
+  'smartdns-ui.enable-cors': ['no'],
+  'smartdns-ui.user': ['admin'],
+  'smartdns-ui.password': ['password'],
+};
+
+const officialDefaultNotes: Record<string, string> = {
+  'server-name': '当前主机名',
+  'cache-size': '自动(-1)',
+  'cache-mem-size': '自动(-1)',
+  'smartdns-ui.max-query-log-age': '2592000(30天)',
 };
 
 function cloneFormState(formState: FormState): FormState {
@@ -342,7 +697,44 @@ function cloneFormState(formState: FormState): FormState {
 }
 
 function getDirectiveCategoryId(directiveName: string): string {
-  return directiveCategoryMap.get(directiveName) ?? 'other';
+  if (basicCommonDirectives.has(directiveName)) {
+    return 'basic';
+  }
+
+  const categoryId = directiveCategoryMap.get(directiveName) ?? 'other';
+  if (categoryId === 'basic') {
+    return 'advanced';
+  }
+
+  return categoryId;
+}
+
+function sortDirectivesForCategory(
+  categoryId: string,
+  directives: SmartdnsConfigSchemaDirective[]
+): SmartdnsConfigSchemaDirective[] {
+  const order = directiveOrderByCategory[categoryId] ?? [];
+
+  return directives.toSorted((left, right) => {
+    const leftIndex = order.indexOf(left.name);
+    const rightIndex = order.indexOf(right.name);
+
+    if (leftIndex !== -1 || rightIndex !== -1) {
+      if (leftIndex === -1) {
+        return 1;
+      }
+
+      if (rightIndex === -1) {
+        return -1;
+      }
+
+      if (leftIndex !== rightIndex) {
+        return leftIndex - rightIndex;
+      }
+    }
+
+    return left.name.localeCompare(right.name);
+  });
 }
 
 function isRepeatableDirective(directiveName: string): boolean {
@@ -355,6 +747,19 @@ function isSelectDirective(directiveName: string, directiveKind: string): boolea
 
 function getSelectOptions(directiveName: string): string[] {
   return selectOptions[directiveName] ?? [];
+}
+
+function getOfficialDefaultValues(directive: SmartdnsConfigSchemaDirective): string[] | null {
+  const values = officialDefaultValues[directive.name];
+  if (!values) {
+    return null;
+  }
+
+  return [...values];
+}
+
+function getDirectiveLabel(directiveName: string): string {
+  return directiveLabels[directiveName] ?? directiveName;
 }
 
 function normalizeBooleanValue(value: string | undefined): 'yes' | 'no' {
@@ -371,6 +776,11 @@ function normalizeBooleanValue(value: string | undefined): 'yes' | 'no' {
 }
 
 function getDefaultDirectiveState(directive: SmartdnsConfigSchemaDirective): DirectiveFormState {
+  const defaultValues = getOfficialDefaultValues(directive);
+  if (defaultValues) {
+    return { enabled: false, values: defaultValues };
+  }
+
   if (isRepeatableDirective(directive.name)) {
     return { enabled: false, values: [] };
   }
@@ -384,6 +794,48 @@ function getDefaultDirectiveState(directive: SmartdnsConfigSchemaDirective): Dir
   }
 
   return { enabled: false, values: [''] };
+}
+
+function getDirectiveDefaultNote(directive: SmartdnsConfigSchemaDirective): string {
+  if (officialDefaultNotes[directive.name]) {
+    return officialDefaultNotes[directive.name];
+  }
+
+  const defaultValues = getOfficialDefaultValues(directive);
+  if (defaultValues && defaultValues.length > 0) {
+    if (directive.kind === 'boolean') {
+      return normalizeBooleanValue(defaultValues[0]) === 'yes' ? '开启' : '关闭';
+    }
+
+    return defaultValues.join('、');
+  }
+
+  if (directive.kind === 'boolean') {
+    return '关闭';
+  }
+
+  return '';
+}
+
+function getDirectiveHelperText(directive: SmartdnsConfigSchemaDirective): string {
+  const baseText =
+    helperTexts[directive.name] ??
+    (isRepeatableDirective(directive.name)
+      ? '支持多条记录，可继续新增多行输入。'
+      : directive.kind === 'boolean'
+        ? '启用后可通过开关写入 yes 或 no。'
+        : directive.kind === 'size'
+          ? '支持填写 128k、1m、1048576 等尺寸值。'
+          : directive.kind === 'integer'
+            ? '请输入整数值。'
+            : isSelectDirective(directive.name, directive.kind)
+              ? '请从下拉列表中选择一个值。'
+              : directive.kind === 'custom'
+                ? '请按照 SmartDNS 原生参数格式填写完整值。'
+                : '请输入该参数的值。');
+  const defaultNote = getDirectiveDefaultNote(directive);
+
+  return defaultNote ? `${baseText} 官方默认：${defaultNote}。` : baseText;
 }
 
 function parseConfigContent(
@@ -650,9 +1102,13 @@ export function SmartdnsConfigForm(): React.JSX.Element {
   const categorySummaries = React.useMemo<DirectiveCategorySummary[]>(() => {
     return CATEGORY_DEFINITIONS.map((category) => ({
       ...category,
-      directives: schema.filter(
-        (directive) =>
-          getDirectiveCategoryId(directive.name) === category.id && matchesSearch(directive, search)
+      directives: sortDirectivesForCategory(
+        category.id,
+        schema.filter(
+          (directive) =>
+            getDirectiveCategoryId(directive.name) === category.id &&
+            matchesSearch(directive, search)
+        )
       ),
     }));
   }, [schema, search]);
@@ -802,19 +1258,7 @@ export function SmartdnsConfigForm(): React.JSX.Element {
     const directiveState = formState[directive.name] ?? getDefaultDirectiveState(directive);
     const repeatable = isRepeatableDirective(directive.name);
     const placeholder = placeholders[directive.name] ?? '';
-    const helperText =
-      helperTexts[directive.name] ??
-      (repeatable
-        ? '支持多条记录，可通过“新增”按钮继续添加。'
-        : directive.kind === 'boolean'
-          ? '启用后可通过滑动开关设置 yes / no。'
-          : directive.kind === 'size'
-            ? '支持填写 128k、1m、1048576 等尺寸值。'
-            : directive.kind === 'integer'
-              ? '请输入数字。'
-              : isSelectDirective(directive.name, directive.kind)
-                ? '请选择一个预设选项。'
-                : '请输入该参数的值。');
+    const helperText = getDirectiveHelperText(directive);
 
     if (repeatable) {
       const valuesToRender = directiveState.values.length > 0 ? directiveState.values : [''];
@@ -827,11 +1271,11 @@ export function SmartdnsConfigForm(): React.JSX.Element {
                 disabled={!directiveState.enabled}
                 fullWidth
                 helperText={index === valuesToRender.length - 1 ? helperText : ' '}
-                label={`${directive.name} #${index + 1}`}
                 onChange={(event) => {
                   updateRepeatableValue(directive, index, event.target.value);
                 }}
-                placeholder={placeholder}
+                placeholder={placeholder || `${getDirectiveLabel(directive.name)} 第 ${index + 1} 项`}
+                size="small"
                 value={value}
               />
               <IconButton
@@ -856,7 +1300,7 @@ export function SmartdnsConfigForm(): React.JSX.Element {
               startIcon={<AddOutlinedIcon />}
               variant="outlined"
             >
-              新增一项
+              新增
             </Button>
           </Stack>
         </Stack>
@@ -895,11 +1339,12 @@ export function SmartdnsConfigForm(): React.JSX.Element {
           disabled={!directiveState.enabled}
           fullWidth
           helperText={helperText}
-          label={directive.name}
           onChange={(event) => {
             updateSingleValue(directive, event.target.value);
           }}
+          placeholder={placeholder}
           select
+          size="small"
           value={directiveState.values[0] ?? ''}
         >
           {options.map((option) => (
@@ -916,13 +1361,13 @@ export function SmartdnsConfigForm(): React.JSX.Element {
         disabled={!directiveState.enabled}
         fullWidth
         helperText={helperText}
-        label={directive.name}
         multiline={directive.kind === 'custom' && directiveState.enabled && !placeholder}
         minRows={directive.kind === 'custom' && directiveState.enabled && !placeholder ? 2 : undefined}
         onChange={(event) => {
           updateSingleValue(directive, event.target.value);
         }}
         placeholder={placeholder}
+        size="small"
         type={directive.kind === 'integer' ? 'number' : 'text'}
         value={directiveState.values[0] ?? ''}
       />
@@ -948,7 +1393,7 @@ export function SmartdnsConfigForm(): React.JSX.Element {
     <Stack spacing={3}>
       <Card>
         <CardHeader
-          subheader="当前页面采用表单化配置方式。每个参数都可以通过勾选启用、滑动开关、下拉框、输入框或多行输入的形式进行设置。"
+          subheader="基础配置聚合常用参数；其余参数预填官方默认值，并使用更紧凑的表单行方式展示。"
           title="SmartDNS 配置"
         />
         <Divider />
@@ -1010,7 +1455,7 @@ export function SmartdnsConfigForm(): React.JSX.Element {
               </Paper>
 
               <Alert severity="info">
-                这一版设置页以表单为主。多值参数支持新增多行输入，布尔项使用滑动开关，枚举项使用下拉框。
+                这一版设置页采用紧凑表单布局。基础配置聚合常用参数，其余字段显示中文注释并预填官方默认值。
               </Alert>
             </Stack>
 
@@ -1103,67 +1548,75 @@ export function SmartdnsConfigForm(): React.JSX.Element {
 
               {notice ? <Alert severity={notice.severity}>{notice.message}</Alert> : null}
 
-              <Stack spacing={2}>
-                {currentCategory?.directives.length ? (
-                  currentCategory.directives.map((directive) => {
-                    const directiveState =
-                      formState[directive.name] ?? getDefaultDirectiveState(directive);
+              {currentCategory?.directives.length ? (
+                <Paper sx={{ borderRadius: 2, overflow: 'hidden' }} variant="outlined">
+                  <Stack divider={<Divider flexItem />} spacing={0}>
+                    {currentCategory.directives.map((directive) => {
+                      const directiveState =
+                        formState[directive.name] ?? getDefaultDirectiveState(directive);
 
-                    return (
-                      <Paper key={directive.name} sx={{ borderRadius: 2, p: 2 }} variant="outlined">
-                        <Stack spacing={2}>
+                      return (
+                        <Stack
+                          key={directive.name}
+                          direction={{ xs: 'column', lg: 'row' }}
+                          spacing={2}
+                          sx={{ px: 2, py: 2 }}
+                        >
                           <Stack
-                            alignItems={{ xs: 'flex-start', md: 'center' }}
-                            direction={{ xs: 'column', md: 'row' }}
-                            justifyContent="space-between"
-                            spacing={1.5}
+                            spacing={0.35}
+                            sx={{
+                              width: { xs: '100%', lg: 168 },
+                              flexShrink: 0,
+                              pt: { lg: 0.75 },
+                            }}
                           >
-                            <Stack spacing={0.75}>
-                              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                                <Typography
-                                  sx={{ fontFamily: '"Roboto Mono", monospace', fontWeight: 700 }}
-                                  variant="subtitle1"
-                                >
-                                  {directive.name}
-                                </Typography>
-                                <Chip label={getDirectiveKindLabel(directive.kind)} size="small" variant="outlined" />
-                                <Chip label={getDirectiveControlLabel(directive)} size="small" variant="outlined" />
-                                <Chip label={directive.source_macro} size="small" variant="outlined" />
-                              </Stack>
-                              <Typography color="text.secondary" variant="body2">
-                                {helperTexts[directive.name] ??
-                                  (isRepeatableDirective(directive.name)
-                                    ? '该参数支持添加多条记录。'
-                                    : directive.kind === 'boolean'
-                                      ? '该参数使用开关控制。'
-                                      : isSelectDirective(directive.name, directive.kind)
-                                        ? '该参数使用下拉框选择。'
-                                        : '该参数使用输入框编辑。')}
-                              </Typography>
-                            </Stack>
-
-                            <FormControlLabel
-                              control={
-                                <Checkbox
-                                  checked={directiveState.enabled}
-                                  onChange={(_event, checked) => {
-                                    updateDirectiveEnabled(directive, checked);
-                                  }}
-                                />
-                              }
-                              label="启用该参数"
-                            />
+                            <Typography sx={{ fontSize: '1rem', fontWeight: 700, lineHeight: 1.5 }} variant="subtitle1">
+                              {getDirectiveLabel(directive.name)}
+                            </Typography>
+                            <Typography
+                              color="text.secondary"
+                              sx={{ fontFamily: '"Roboto Mono", monospace' }}
+                              variant="caption"
+                            >
+                              {directive.name}
+                            </Typography>
                           </Stack>
 
-                          {renderDirectiveControl(directive)}
+                          <Stack spacing={1} sx={{ flex: 1, minWidth: 0 }}>
+                            <Stack
+                              alignItems={{ xs: 'flex-start', sm: 'center' }}
+                              direction={{ xs: 'column', sm: 'row' }}
+                              justifyContent="space-between"
+                              spacing={1}
+                            >
+                              <Typography color="text.secondary" variant="caption">
+                                {`${getDirectiveKindLabel(directive.kind)} · ${getDirectiveControlLabel(directive)} · ${directive.source_macro}`}
+                              </Typography>
+                              <FormControlLabel
+                                control={
+                                  <Checkbox
+                                    checked={directiveState.enabled}
+                                    onChange={(_event, checked) => {
+                                      updateDirectiveEnabled(directive, checked);
+                                    }}
+                                    size="small"
+                                  />
+                                }
+                                label="启用"
+                                sx={{ m: 0 }}
+                              />
+                            </Stack>
+
+                            {renderDirectiveControl(directive)}
+                          </Stack>
                         </Stack>
-                      </Paper>
-                    );
-                  })
-                ) : (
-                  <Alert severity="info">当前分类或搜索条件下没有匹配到参数。</Alert>
-                )}
-              </Stack>
+                      );
+                    })}
+                  </Stack>
+                </Paper>
+              ) : (
+                <Alert severity="info">当前分类或搜索条件下没有匹配到参数。</Alert>
+              )}
 
               <Paper sx={{ borderRadius: 2, p: 2 }} variant="outlined">
                 <Stack
