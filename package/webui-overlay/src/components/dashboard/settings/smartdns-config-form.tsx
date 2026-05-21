@@ -284,6 +284,16 @@ const repeatableDirectives = new Set<string>([
   'conf-file',
 ]);
 
+const bootstrapCapableDirectives = new Set<string>([
+  'server',
+  'server-tcp',
+  'server-tls',
+  'server-https',
+  'server-h3',
+  'server-http3',
+  'server-quic',
+]);
+
 const selectOptions: Record<string, string[]> = {
   'response-mode': ['first-ping', 'fastest-ip', 'fastest-response'],
   'log-level': ['off', 'fatal', 'error', 'warn', 'notice', 'info', 'debug'],
@@ -324,13 +334,13 @@ const helperTexts: Record<string, string> = {
   'bind-tcp': 'TCP 监听地址，可按行添加多个地址。',
   'bind-tls': 'TLS 监听地址，启用时需配合证书参数。',
   'bind-https': 'HTTPS 监听地址，启用时需配合证书参数。',
-  server: '上游 DNS 列表，SmartDNS 至少需要一个可用上游。',
-  'server-tcp': 'TCP 上游 DNS 列表，可按行添加。',
-  'server-tls': 'TLS 上游 DNS 列表，可按行添加。',
-  'server-https': 'HTTPS 上游 DNS 列表，可按行添加。',
-  'server-h3': 'HTTP/3 上游 DNS 列表，可按行添加。',
-  'server-http3': 'HTTP/3 上游 DNS 列表，可按行添加。',
-  'server-quic': 'QUIC 上游 DNS 列表，可按行添加。',
+  server: '上游 DNS 列表，SmartDNS 至少需要一个可用上游；每一项都可单独勾选为 Bootstrap 服务器。',
+  'server-tcp': 'TCP 上游 DNS 列表，可按行添加；每一项都可单独勾选为 Bootstrap 服务器。',
+  'server-tls': 'TLS 上游 DNS 列表，可按行添加；每一项都可单独勾选为 Bootstrap 服务器。',
+  'server-https': 'HTTPS 上游 DNS 列表，可按行添加；每一项都可单独勾选为 Bootstrap 服务器。',
+  'server-h3': 'HTTP/3 上游 DNS 列表，可按行添加；每一项都可单独勾选为 Bootstrap 服务器。',
+  'server-http3': 'HTTP/3 上游 DNS 列表，可按行添加；每一项都可单独勾选为 Bootstrap 服务器。',
+  'server-quic': 'QUIC 上游 DNS 列表，可按行添加；每一项都可单独勾选为 Bootstrap 服务器。',
   'proxy-server': '代理服务器定义，供上游 DNS 通过代理访问。',
   'cache-size': 'DNS 缓存条目数量，0 表示关闭缓存。',
   'cache-mem-size': '限制缓存可使用的内存大小。',
@@ -687,6 +697,18 @@ const officialDefaultNotes: Record<string, string> = {
   'smartdns-ui.max-query-log-age': '2592000(30天)',
 };
 
+const requiredDirectives = new Set<string>([
+  'server-name',
+  'bind',
+  'server',
+  'plugin',
+  'smartdns-ui.conf-file',
+  'smartdns-ui.www-root',
+  'smartdns-ui.ip',
+  'smartdns-ui.user',
+  'smartdns-ui.password',
+]);
+
 function cloneFormState(formState: FormState): FormState {
   return Object.fromEntries(
     Object.entries(formState).map(([key, value]) => [
@@ -741,6 +763,31 @@ function isRepeatableDirective(directiveName: string): boolean {
   return repeatableDirectives.has(directiveName);
 }
 
+function isBootstrapCapableDirective(directiveName: string): boolean {
+  return bootstrapCapableDirectives.has(directiveName);
+}
+
+function normalizeInlineValue(value: string): string {
+  return value.trim().replaceAll(/\s{2,}/g, ' ');
+}
+
+function parseBootstrapServerValue(raw: string): { value: string; bootstrap: boolean } {
+  const bootstrapPattern = /(^|\s+)-(?:bootstrap-dns|b)(?=\s|$)/g;
+  const bootstrap = bootstrapPattern.test(raw);
+  const value = normalizeInlineValue(raw.replaceAll(bootstrapPattern, ' '));
+
+  return { value, bootstrap };
+}
+
+function serializeBootstrapServerValue(value: string, bootstrap: boolean): string {
+  const normalizedValue = normalizeInlineValue(value);
+  if (!normalizedValue) {
+    return '';
+  }
+
+  return bootstrap ? `${normalizedValue} -bootstrap-dns` : normalizedValue;
+}
+
 function isSelectDirective(directiveName: string, directiveKind: string): boolean {
   return directiveKind === 'enum' || Object.hasOwn(selectOptions, directiveName);
 }
@@ -762,6 +809,10 @@ function getDirectiveLabel(directiveName: string): string {
   return directiveLabels[directiveName] ?? directiveName;
 }
 
+function isDirectiveRequired(directiveName: string): boolean {
+  return requiredDirectives.has(directiveName);
+}
+
 function normalizeBooleanValue(value: string | undefined): 'yes' | 'no' {
   if (!value) {
     return 'no';
@@ -778,22 +829,25 @@ function normalizeBooleanValue(value: string | undefined): 'yes' | 'no' {
 function getDefaultDirectiveState(directive: SmartdnsConfigSchemaDirective): DirectiveFormState {
   const defaultValues = getOfficialDefaultValues(directive);
   if (defaultValues) {
-    return { enabled: false, values: defaultValues };
+    return { enabled: isDirectiveRequired(directive.name), values: defaultValues };
   }
 
   if (isRepeatableDirective(directive.name)) {
-    return { enabled: false, values: [] };
+    return { enabled: isDirectiveRequired(directive.name), values: [] };
   }
 
   if (directive.kind === 'boolean') {
-    return { enabled: false, values: ['no'] };
+    return { enabled: isDirectiveRequired(directive.name), values: ['no'] };
   }
 
   if (isSelectDirective(directive.name, directive.kind)) {
-    return { enabled: false, values: [getSelectOptions(directive.name)[0] ?? ''] };
+    return {
+      enabled: isDirectiveRequired(directive.name),
+      values: [getSelectOptions(directive.name)[0] ?? ''],
+    };
   }
 
-  return { enabled: false, values: [''] };
+  return { enabled: isDirectiveRequired(directive.name), values: [''] };
 }
 
 function getDirectiveDefaultNote(directive: SmartdnsConfigSchemaDirective): string {
@@ -891,6 +945,18 @@ function parseConfigContent(
     };
   }
 
+  for (const directive of schema) {
+    if (!isDirectiveRequired(directive.name)) {
+      continue;
+    }
+
+    const currentState = directiveState[directive.name] ?? getDefaultDirectiveState(directive);
+    directiveState[directive.name] = {
+      enabled: true,
+      values: [...currentState.values],
+    };
+  }
+
   return directiveState;
 }
 
@@ -906,7 +972,7 @@ function serializeConfigContent(
 
   for (const directive of schema) {
     const directiveValue = formState[directive.name];
-    if (!directiveValue?.enabled) {
+    if (!directiveValue?.enabled && !isDirectiveRequired(directive.name)) {
       continue;
     }
 
@@ -944,52 +1010,6 @@ function matchesSearch(directive: SmartdnsConfigSchemaDirective, keyword: string
     directive.kind.toLowerCase().includes(normalizedKeyword) ||
     directive.source_macro.toLowerCase().includes(normalizedKeyword)
   );
-}
-
-function getDirectiveKindLabel(kind: string): string {
-  switch (kind) {
-    case 'boolean': {
-      return '开关';
-    }
-    case 'integer': {
-      return '整数';
-    }
-    case 'size': {
-      return '尺寸';
-    }
-    case 'enum': {
-      return '下拉';
-    }
-    case 'string': {
-      return '文本';
-    }
-    case 'custom': {
-      return '自定义';
-    }
-    default: {
-      return kind;
-    }
-  }
-}
-
-function getDirectiveControlLabel(directive: SmartdnsConfigSchemaDirective): string {
-  if (isRepeatableDirective(directive.name)) {
-    return '多值输入';
-  }
-
-  if (directive.kind === 'boolean') {
-    return '滑动开关';
-  }
-
-  if (isSelectDirective(directive.name, directive.kind)) {
-    return '下拉选项';
-  }
-
-  if (directive.kind === 'integer') {
-    return '数字输入';
-  }
-
-  return '文本输入';
 }
 
 async function parseErrorMessage(response: Response): Promise<string> {
@@ -1256,7 +1276,9 @@ export function SmartdnsConfigForm(): React.JSX.Element {
 
   const renderDirectiveControl = (directive: SmartdnsConfigSchemaDirective): React.ReactNode => {
     const directiveState = formState[directive.name] ?? getDefaultDirectiveState(directive);
+    const required = isDirectiveRequired(directive.name);
     const repeatable = isRepeatableDirective(directive.name);
+    const bootstrapCapable = isBootstrapCapableDirective(directive.name);
     const placeholder = placeholders[directive.name] ?? '';
     const helperText = getDirectiveHelperText(directive);
 
@@ -1265,34 +1287,77 @@ export function SmartdnsConfigForm(): React.JSX.Element {
 
       return (
         <Stack spacing={1.25}>
-          {valuesToRender.map((value, index) => (
-            <Stack key={`${directive.name}-${index}`} direction="row" spacing={1} alignItems="center">
-              <TextField
-                disabled={!directiveState.enabled}
-                fullWidth
-                helperText={index === valuesToRender.length - 1 ? helperText : ' '}
-                onChange={(event) => {
-                  updateRepeatableValue(directive, index, event.target.value);
-                }}
-                placeholder={placeholder || `${getDirectiveLabel(directive.name)} 第 ${index + 1} 项`}
-                size="small"
-                value={value}
-              />
-              <IconButton
-                aria-label="删除"
-                color="error"
-                disabled={!directiveState.enabled}
-                onClick={() => {
-                  removeRepeatableValue(directive, index);
-                }}
+          {valuesToRender.map((rawValue, index) => {
+            const parsedValue = bootstrapCapable
+              ? parseBootstrapServerValue(rawValue)
+              : { value: rawValue, bootstrap: false };
+
+            return (
+              <Stack
+                key={`${directive.name}-${index}`}
+                alignItems={{ xs: 'stretch', md: 'center' }}
+                direction={{ xs: 'column', md: 'row' }}
+                spacing={1}
               >
-                <DeleteOutlineOutlinedIcon />
-              </IconButton>
-            </Stack>
-          ))}
+                <TextField
+                  disabled={!directiveState.enabled && !required}
+                  fullWidth
+                  helperText={index === valuesToRender.length - 1 ? helperText : ' '}
+                  onChange={(event) => {
+                    const nextValue = bootstrapCapable
+                      ? serializeBootstrapServerValue(event.target.value, parsedValue.bootstrap)
+                      : event.target.value;
+                    updateRepeatableValue(directive, index, nextValue);
+                  }}
+                  placeholder={placeholder || `${getDirectiveLabel(directive.name)} 第 ${index + 1} 项`}
+                  size="small"
+                  value={parsedValue.value}
+                />
+                {bootstrapCapable ? (
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={parsedValue.bootstrap}
+                        disabled={!directiveState.enabled && !required}
+                        onChange={(_event, checked) => {
+                          updateRepeatableValue(
+                            directive,
+                            index,
+                            serializeBootstrapServerValue(parsedValue.value, checked)
+                          );
+                        }}
+                        size="small"
+                      />
+                    }
+                    label="Bootstrap 服务器"
+                    labelPlacement="start"
+                    sx={{
+                      m: 0,
+                      flexShrink: 0,
+                      alignSelf: { xs: 'flex-start', md: 'center' },
+                      '& .MuiFormControlLabel-label': {
+                        fontSize: '0.875rem',
+                        whiteSpace: 'nowrap',
+                      },
+                    }}
+                  />
+                ) : null}
+                <IconButton
+                  aria-label="删除"
+                  color="error"
+                  disabled={!directiveState.enabled && !required}
+                  onClick={() => {
+                    removeRepeatableValue(directive, index);
+                  }}
+                >
+                  <DeleteOutlineOutlinedIcon />
+                </IconButton>
+              </Stack>
+            );
+          })}
           <Stack direction="row" justifyContent="flex-start">
             <Button
-              disabled={!directiveState.enabled}
+              disabled={!directiveState.enabled && !required}
               onClick={() => {
                 addRepeatableValue(directive);
               }}
@@ -1316,7 +1381,7 @@ export function SmartdnsConfigForm(): React.JSX.Element {
             control={
               <Switch
                 checked={checked}
-                disabled={!directiveState.enabled}
+                disabled={!directiveState.enabled && !required}
                 onChange={(_event, nextChecked) => {
                   updateSingleValue(directive, nextChecked ? 'yes' : 'no');
                 }}
@@ -1336,7 +1401,7 @@ export function SmartdnsConfigForm(): React.JSX.Element {
 
       return (
         <TextField
-          disabled={!directiveState.enabled}
+          disabled={!directiveState.enabled && !required}
           fullWidth
           helperText={helperText}
           onChange={(event) => {
@@ -1358,7 +1423,7 @@ export function SmartdnsConfigForm(): React.JSX.Element {
 
     return (
       <TextField
-        disabled={!directiveState.enabled}
+        disabled={!directiveState.enabled && !required}
         fullWidth
         helperText={helperText}
         multiline={directive.kind === 'custom' && directiveState.enabled && !placeholder}
@@ -1554,6 +1619,7 @@ export function SmartdnsConfigForm(): React.JSX.Element {
                     {currentCategory.directives.map((directive) => {
                       const directiveState =
                         formState[directive.name] ?? getDefaultDirectiveState(directive);
+                      const required = isDirectiveRequired(directive.name);
 
                       return (
                         <Stack
@@ -1583,29 +1649,28 @@ export function SmartdnsConfigForm(): React.JSX.Element {
                           </Stack>
 
                           <Stack spacing={1} sx={{ flex: 1, minWidth: 0 }}>
-                            <Stack
-                              alignItems={{ xs: 'flex-start', sm: 'center' }}
-                              direction={{ xs: 'column', sm: 'row' }}
-                              justifyContent="space-between"
-                              spacing={1}
-                            >
-                              <Typography color="text.secondary" variant="caption">
-                                {`${getDirectiveKindLabel(directive.kind)} · ${getDirectiveControlLabel(directive)} · ${directive.source_macro}`}
-                              </Typography>
-                              <FormControlLabel
-                                control={
-                                  <Checkbox
-                                    checked={directiveState.enabled}
-                                    onChange={(_event, checked) => {
-                                      updateDirectiveEnabled(directive, checked);
-                                    }}
-                                    size="small"
-                                  />
-                                }
-                                label="启用"
-                                sx={{ m: 0 }}
-                              />
-                            </Stack>
+                            {required ? null : (
+                              <Stack
+                                alignItems={{ xs: 'flex-start', sm: 'center' }}
+                                direction={{ xs: 'column', sm: 'row' }}
+                                justifyContent="flex-end"
+                                spacing={1}
+                              >
+                                <FormControlLabel
+                                  control={
+                                    <Checkbox
+                                      checked={directiveState.enabled}
+                                      onChange={(_event, checked) => {
+                                        updateDirectiveEnabled(directive, checked);
+                                      }}
+                                      size="small"
+                                    />
+                                  }
+                                  label="启用"
+                                  sx={{ m: 0 }}
+                                />
+                              </Stack>
+                            )}
 
                             {renderDirectiveControl(directive)}
                           </Stack>
