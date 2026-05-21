@@ -78,8 +78,8 @@ const hiddenDirectiveNames = new Set<string>(['server-http3']);
 const CATEGORY_DEFINITIONS: DirectiveCategory[] = [
   {
     id: 'basic',
-    title: '基础配置',
-    description: '常用配置：监听、上游、缓存策略与日志级别。',
+    title: '基础设置',
+    description: '常用配置：监听、缓存策略与日志级别。',
   },
   {
     id: 'upstream',
@@ -387,11 +387,8 @@ const helperTexts: Record<string, string> = {
 
 const basicCommonDirectives = new Set<string>([
   'server-name',
-  'resolv-hostname',
-  'user',
   'bind',
   'bind-tcp',
-  'server',
   'cache-size',
   'prefetch-domain',
   'serve-expired',
@@ -404,16 +401,14 @@ const directiveOrderByCategory: Record<string, string[]> = {
     'server-name',
     'bind',
     'bind-tcp',
-    'server',
     'response-mode',
     'cache-size',
     'prefetch-domain',
     'serve-expired',
     'log-level',
-    'resolv-hostname',
-    'user',
   ],
   upstream: [
+    'server',
     'server-tcp',
     'server-tls',
     'server-https',
@@ -1480,7 +1475,7 @@ export function SmartdnsConfigForm(): React.JSX.Element {
     <Stack spacing={3}>
       <Card>
         <CardHeader
-          subheader="基础配置聚合常用参数；其余参数预填官方默认值，并使用更紧凑的表单行方式展示。"
+          subheader="基础设置聚合常用参数；其余参数预填官方默认值，并使用更紧凑的表单行方式展示。"
           title="SmartDNS 配置"
         />
         <Divider />
@@ -1542,7 +1537,7 @@ export function SmartdnsConfigForm(): React.JSX.Element {
               </Paper>
 
               <Alert severity="info">
-                这一版设置页采用紧凑表单布局。基础配置聚合常用参数，其余字段显示中文注释并预填官方默认值。
+                这一版设置页采用紧凑表单布局。基础设置聚合常用参数，其余字段显示中文注释并预填官方默认值。
               </Alert>
             </Stack>
 
