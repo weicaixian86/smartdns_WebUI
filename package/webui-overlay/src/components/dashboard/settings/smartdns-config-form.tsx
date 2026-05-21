@@ -72,6 +72,9 @@ interface DirectiveFormState {
 type FormState = Record<string, DirectiveFormState>;
 type NoticeState = { severity: 'success' | 'info' | 'error'; message: string } | null;
 
+const directiveAliases = new Map<string, string>([['server-http3', 'server-h3']]);
+const hiddenDirectiveNames = new Set<string>(['server-http3']);
+
 const CATEGORY_DEFINITIONS: DirectiveCategory[] = [
   {
     id: 'basic',
@@ -892,11 +895,22 @@ function getDirectiveHelperText(directive: SmartdnsConfigSchemaDirective): strin
   return defaultNote ? `${baseText} 官方默认：${defaultNote}。` : baseText;
 }
 
+function normalizeDirectiveName(directiveName: string): string {
+  return directiveAliases.get(directiveName) ?? directiveName;
+}
+
+function normalizeSchemaDirectives(
+  directives: SmartdnsConfigSchemaDirective[]
+): SmartdnsConfigSchemaDirective[] {
+  return directives.filter((directive) => !hiddenDirectiveNames.has(directive.name));
+}
+
 function parseConfigContent(
   content: string,
   schema: SmartdnsConfigSchemaDirective[]
 ): FormState {
   const directiveLookup = new Set(schema.map((directive) => directive.name));
+  const parsedRepeatableDirectives = new Set<string>();
   const directiveState = Object.fromEntries(
     schema.map((directive) => [directive.name, getDefaultDirectiveState(directive)])
   ) as FormState;
@@ -909,8 +923,9 @@ function parseConfigContent(
     }
 
     const separatorIndex = trimmedLine.search(/\s/);
-    const directiveName =
+    const rawDirectiveName =
       separatorIndex === -1 ? trimmedLine : trimmedLine.slice(0, separatorIndex).trim();
+    const directiveName = normalizeDirectiveName(rawDirectiveName);
     const directiveValue =
       separatorIndex === -1 ? '' : trimmedLine.slice(separatorIndex).trim();
 
@@ -924,9 +939,13 @@ function parseConfigContent(
     }
 
     if (isRepeatableDirective(directiveName)) {
+      const currentValues = parsedRepeatableDirectives.has(directiveName)
+        ? directiveState[directiveName].values
+        : [];
+      parsedRepeatableDirectives.add(directiveName);
       directiveState[directiveName] = {
         enabled: true,
-        values: [...directiveState[directiveName].values, directiveValue],
+        values: [...currentValues, directiveValue],
       };
       continue;
     }
@@ -1054,6 +1073,7 @@ export function SmartdnsConfigForm(): React.JSX.Element {
 
         const response = await fetch(path, {
           ...init,
+          cache: 'no-store',
           credentials: 'include',
           headers,
         });
@@ -1099,8 +1119,10 @@ export function SmartdnsConfigForm(): React.JSX.Element {
       return;
     }
 
-    const nextSchema = [...(schemaResponse.data?.directives ?? [])].toSorted((left, right) =>
-      left.name.localeCompare(right.name)
+    const nextSchema = normalizeSchemaDirectives(
+      [...(schemaResponse.data?.directives ?? [])].toSorted((left, right) =>
+        left.name.localeCompare(right.name)
+      )
     );
     const nextFormState = parseConfigContent(fileResponse.data?.content ?? '', nextSchema);
 
@@ -1251,12 +1273,12 @@ export function SmartdnsConfigForm(): React.JSX.Element {
       return;
     }
 
-    setOriginalFormState(cloneFormState(formState));
+    await loadConfig();
     setNotice({
       severity: 'success',
       message: '表单配置已保存，服务端已保留 .bak 备份。',
     });
-  }, [apiFetch, formState, generatedContent]);
+  }, [apiFetch, generatedContent, loadConfig]);
 
   const restartServer = React.useCallback(async (): Promise<void> => {
     setIsRestarting(true);
@@ -1649,13 +1671,16 @@ export function SmartdnsConfigForm(): React.JSX.Element {
                           </Stack>
 
                           <Stack spacing={1} sx={{ flex: 1, minWidth: 0 }}>
-                            {required ? null : (
-                              <Stack
-                                alignItems={{ xs: 'flex-start', sm: 'center' }}
-                                direction={{ xs: 'column', sm: 'row' }}
-                                justifyContent="flex-end"
-                                spacing={1}
-                              >
+                            <Stack
+                              alignItems={{ xs: 'stretch', md: 'flex-start' }}
+                              direction={{ xs: 'column', md: 'row' }}
+                              spacing={1.25}
+                            >
+                              <Stack sx={{ flex: 1, minWidth: 0 }}>
+                                {renderDirectiveControl(directive)}
+                              </Stack>
+
+                              {required ? null : (
                                 <FormControlLabel
                                   control={
                                     <Checkbox
@@ -1667,12 +1692,18 @@ export function SmartdnsConfigForm(): React.JSX.Element {
                                     />
                                   }
                                   label="启用"
-                                  sx={{ m: 0 }}
+                                  sx={{
+                                    m: 0,
+                                    flexShrink: 0,
+                                    alignSelf: { xs: 'flex-end', md: 'flex-start' },
+                                    pt: { md: 0.25 },
+                                    '& .MuiFormControlLabel-label': {
+                                      whiteSpace: 'nowrap',
+                                    },
+                                  }}
                                 />
-                              </Stack>
-                            )}
-
-                            {renderDirectiveControl(directive)}
+                              )}
+                            </Stack>
                           </Stack>
                         </Stack>
                       );
