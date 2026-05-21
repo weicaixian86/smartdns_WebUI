@@ -3,12 +3,11 @@
 import * as React from 'react';
 import Stack from '@mui/material/Stack';
 
-import { UpdatePasswordForm } from '@/components/dashboard/settings/update-password-form';
 import { ChangeLang } from '@/components/dashboard/settings/change-lang';
 import { SmartdnsConfigForm } from '@/components/dashboard/settings/smartdns-config-form';
+import { UpdatePasswordForm } from '@/components/dashboard/settings/update-password-form';
 import { TabContext, TabList, TabPanel } from '@mui/lab';
 import { Box, Card, CardContent, Tab, Typography } from '@mui/material';
-import { useTranslation } from 'react-i18next';
 
 const tabs = [
   {
@@ -16,17 +15,16 @@ const tabs = [
     panel: <SmartdnsConfigForm />,
   },
   {
-    label: 'Password',
+    label: '登录密码',
     panel: <UpdatePasswordForm />,
   },
   {
-    label: 'Language',
+    label: '语言',
     panel: <ChangeLang />,
   },
 ];
 
 export default function SettingsTab(): React.JSX.Element {
-  const { t } = useTranslation();
   const [value, setValue] = React.useState('0');
 
   const handleChange = (_event: React.SyntheticEvent, newValue: string): void => {
@@ -40,7 +38,7 @@ export default function SettingsTab(): React.JSX.Element {
           <CardContent sx={{ p: 0 }}>
             <Box sx={{ px: 3, pt: 3, borderBottom: 1, borderColor: 'divider' }}>
               <Typography variant="h5" sx={{ mb: 2 }}>
-                {t('Settings')}
+                设置
               </Typography>
               <TabList
                 allowScrollButtonsMobile
@@ -49,7 +47,7 @@ export default function SettingsTab(): React.JSX.Element {
                 variant="scrollable"
               >
                 {tabs.map((tab, index) => (
-                  <Tab key={tab.label} label={t(tab.label)} value={index.toString()} />
+                  <Tab key={tab.label} label={tab.label} value={index.toString()} />
                 ))}
               </TabList>
             </Box>

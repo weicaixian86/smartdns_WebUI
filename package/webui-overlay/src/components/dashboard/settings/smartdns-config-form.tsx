@@ -1,29 +1,37 @@
 'use client';
 
 import * as React from 'react';
-import {
-  Alert,
-  Button,
-  Card,
-  CardActions,
-  CardContent,
-  CardHeader,
-  Chip,
-  CircularProgress,
-  Divider,
-  List,
-  ListItemButton,
-  ListItemText,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
-import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined';
+import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
+import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
 import RestartAltOutlinedIcon from '@mui/icons-material/RestartAltOutlined';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import UndoOutlinedIcon from '@mui/icons-material/UndoOutlined';
+import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import {
+  Alert,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  Checkbox,
+  Chip,
+  CircularProgress,
+  Collapse,
+  Divider,
+  FormControlLabel,
+  IconButton,
+  List,
+  ListItemButton,
+  ListItemText,
+  MenuItem,
+  Paper,
+  Stack,
+  Switch,
+  TextField,
+  Typography,
+} from '@mui/material';
 import { useTranslation } from 'react-i18next';
 
 import { useUser } from '@/hooks/use-user';
@@ -56,53 +64,59 @@ interface DirectiveCategorySummary extends DirectiveCategory {
   directives: SmartdnsConfigSchemaDirective[];
 }
 
+interface DirectiveFormState {
+  enabled: boolean;
+  values: string[];
+}
+
+type FormState = Record<string, DirectiveFormState>;
 type NoticeState = { severity: 'success' | 'info' | 'error'; message: string } | null;
 
 const CATEGORY_DEFINITIONS: DirectiveCategory[] = [
   {
     id: 'basic',
     title: '基础配置',
-    description: '用于设置服务启动、监听地址、运行用户、路径和基础运行行为。',
+    description: '服务名称、监听地址、运行用户和基础运行行为。',
   },
   {
     id: 'upstream',
-    title: '上游 DNS 服务器',
-    description: '配置上游解析服务器、证书信任和代理转发相关参数。',
+    title: '上游 DNS',
+    description: '上游 DNS 服务器、TLS/HTTPS/QUIC、代理和证书相关配置。',
   },
   {
     id: 'cache',
     title: '缓存与应答',
-    description: '调整缓存生命周期、TTL 处理、数量限制和应答策略。',
+    description: '缓存大小、过期应答、TTL 和返回策略。',
   },
   {
     id: 'logging',
     title: '日志与审计',
-    description: '管理运行日志、审计文件以及调试相关开关。',
+    description: '日志级别、日志文件、审计文件和调试项。',
   },
   {
     id: 'domainRules',
     title: '域名与分组规则',
-    description: '设置域名分流、地址映射、CNAME、规则组和客户端规则。',
+    description: '域名路由、地址映射、规则组、客户端规则等。',
   },
   {
     id: 'ipRules',
     title: 'IP 规则与集合',
-    description: '管理黑白名单、IPSet、NFTSet、IP 别名以及 ECS 设置。',
+    description: '黑白名单、IPSet、NFTSet、IP 别名和 ECS。',
   },
   {
     id: 'advanced',
-    title: '高级网络配置',
-    description: '处理双栈优选、DNS64、本地解析、证书文件和高级插件配置。',
+    title: '高级设置',
+    description: '双栈优选、DNS64、本地解析、证书文件和插件。',
   },
   {
     id: 'webui',
     title: 'WebUI 插件',
-    description: '控制 6080 WebUI 插件自身的运行参数和行为。',
+    description: '6080 管理界面的地址、账号、CORS 和终端开关。',
   },
   {
     id: 'other',
     title: '其他',
-    description: '尚未归类到以上分组的配置指令。',
+    description: '暂未归入以上分类的配置项。',
   },
 ];
 
@@ -227,34 +241,263 @@ const directiveCategoryMap = new Map<string, string>([
   ['smartdns-ui.password', 'webui'],
 ]);
 
+const repeatableDirectives = new Set<string>([
+  'bind',
+  'bind-tcp',
+  'bind-tls',
+  'bind-https',
+  'server',
+  'server-tcp',
+  'server-tls',
+  'server-https',
+  'server-h3',
+  'server-http3',
+  'server-quic',
+  'nameserver',
+  'address',
+  'cname',
+  'srv-record',
+  'https-record',
+  'proxy-server',
+  'ipset',
+  'ipset-no-speed',
+  'nftset',
+  'nftset-no-speed',
+  'blacklist-ip',
+  'whitelist-ip',
+  'ip-alias',
+  'ip-rules',
+  'ip-set',
+  'bogus-nxdomain',
+  'ignore-ip',
+  'edns-client-subnet',
+  'domain-rules',
+  'domain-set',
+  'ddns-domain',
+  'local-domain',
+  'dns64',
+  'group-begin',
+  'group-end',
+  'group-match',
+  'client-rules',
+  'plugin',
+  'conf-file',
+]);
+
+const selectOptions: Record<string, string[]> = {
+  'response-mode': ['first-ping', 'fastest-ip', 'fastest-response'],
+  'log-level': ['off', 'fatal', 'error', 'warn', 'notice', 'info', 'debug'],
+};
+
+const placeholders: Record<string, string> = {
+  bind: '例如 :6053 或 0.0.0.0:53',
+  'bind-tcp': '例如 :6053 或 0.0.0.0:53',
+  'bind-tls': '例如 0.0.0.0:853',
+  'bind-https': '例如 0.0.0.0:8443',
+  server: '例如 223.5.5.5 或 https://dns.google/dns-query',
+  'server-tcp': '例如 8.8.8.8:53',
+  'server-tls': '例如 1.1.1.1 或 tls://1.1.1.1:853',
+  'server-https': '例如 https://dns.google/dns-query',
+  'server-h3': '例如 h3://dns.adguard-dns.com:443',
+  'server-http3': '例如 h3://dns.adguard-dns.com:443',
+  'server-quic': '例如 quic://94.140.14.14:853',
+  'proxy-server': '例如 socks5://127.0.0.1:1080 -name proxy',
+  'cache-file': '例如 /var/cache/smartdns.cache',
+  'data-dir': '例如 /var/lib/smartdns',
+  'log-file': '例如 /var/log/smartdns/smartdns.log',
+  'audit-file': '例如 /var/log/smartdns/smartdns-audit.log',
+  'dnsmasq-lease-file': '例如 /var/lib/misc/dnsmasq.leases',
+  'hosts-file': '例如 /etc/hosts',
+  'ca-file': '例如 /etc/ssl/certs/ca-certificates.crt',
+  'ca-path': '例如 /etc/ssl/certs',
+  'smartdns-ui.conf-file': '例如 /etc/smartdns/smartdns.conf',
+  'smartdns-ui.www-root': '例如 /usr/share/smartdns/wwwroot',
+  'smartdns-ui.ip': '例如 http://0.0.0.0:6080',
+  'smartdns-ui.user': '例如 admin',
+  'smartdns-ui.password': '例如 password',
+  'server-name': '例如 smartdns',
+};
+
+const helperTexts: Record<string, string> = {
+  bind: '支持添加多个监听地址，每行一条。',
+  'bind-tcp': '支持添加多个 TCP 监听地址，每行一条。',
+  server: '可添加多个上游 UDP/DoH 地址，每行一条。',
+  'server-tls': '可添加多个 DoT 地址，每行一条。',
+  'server-https': '可添加多个 DoH 地址，每行一条。',
+  'server-quic': '可添加多个 DoQ 地址，每行一条。',
+  plugin: '插件按行添加，测试 UI 时通常保留 smartdns_ui.so。',
+  'smartdns-ui.ip': '填写 WebUI 监听地址，测试时常用 http://0.0.0.0:6080。',
+  'smartdns-ui.password': '这里填写 WebUI 登录密码明文，插件会在服务端处理。',
+  'response-mode': '请选择返回给客户端的 IP 选择策略。',
+  'log-level': '请选择日志输出级别。',
+};
+
+function cloneFormState(formState: FormState): FormState {
+  return Object.fromEntries(
+    Object.entries(formState).map(([key, value]) => [
+      key,
+      { enabled: value.enabled, values: [...value.values] },
+    ])
+  );
+}
+
 function getDirectiveCategoryId(directiveName: string): string {
   return directiveCategoryMap.get(directiveName) ?? 'other';
 }
 
-function buildDirectiveTemplate(directive: SmartdnsConfigSchemaDirective): string {
-  switch (directive.kind) {
-    case 'boolean': {
-      return `${directive.name} yes`;
-    }
-    case 'integer': {
-      return `${directive.name} 0`;
-    }
-    case 'size': {
-      return `${directive.name} 0`;
-    }
-    case 'enum': {
-      return `${directive.name} `;
-    }
-    default: {
-      return `${directive.name} `;
-    }
+function isRepeatableDirective(directiveName: string): boolean {
+  return repeatableDirectives.has(directiveName);
+}
+
+function isSelectDirective(directiveName: string, directiveKind: string): boolean {
+  return directiveKind === 'enum' || Object.hasOwn(selectOptions, directiveName);
+}
+
+function getSelectOptions(directiveName: string): string[] {
+  return selectOptions[directiveName] ?? [];
+}
+
+function normalizeBooleanValue(value: string | undefined): 'yes' | 'no' {
+  if (!value) {
+    return 'no';
   }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'yes' || normalized === 'true' || normalized === '1' || normalized === 'on') {
+    return 'yes';
+  }
+
+  return 'no';
+}
+
+function getDefaultDirectiveState(directive: SmartdnsConfigSchemaDirective): DirectiveFormState {
+  if (isRepeatableDirective(directive.name)) {
+    return { enabled: false, values: [] };
+  }
+
+  if (directive.kind === 'boolean') {
+    return { enabled: false, values: ['no'] };
+  }
+
+  if (isSelectDirective(directive.name, directive.kind)) {
+    return { enabled: false, values: [getSelectOptions(directive.name)[0] ?? ''] };
+  }
+
+  return { enabled: false, values: [''] };
+}
+
+function parseConfigContent(
+  content: string,
+  schema: SmartdnsConfigSchemaDirective[]
+): FormState {
+  const directiveLookup = new Set(schema.map((directive) => directive.name));
+  const directiveState = Object.fromEntries(
+    schema.map((directive) => [directive.name, getDefaultDirectiveState(directive)])
+  ) as FormState;
+
+  for (const rawLine of content.split(/\r?\n/)) {
+    const trimmedLine = rawLine.trim();
+
+    if (!trimmedLine || trimmedLine.startsWith('#')) {
+      continue;
+    }
+
+    const separatorIndex = trimmedLine.search(/\s/);
+    const directiveName =
+      separatorIndex === -1 ? trimmedLine : trimmedLine.slice(0, separatorIndex).trim();
+    const directiveValue =
+      separatorIndex === -1 ? '' : trimmedLine.slice(separatorIndex).trim();
+
+    if (!directiveLookup.has(directiveName)) {
+      continue;
+    }
+
+    const schemaDirective = schema.find((directive) => directive.name === directiveName);
+    if (!schemaDirective) {
+      continue;
+    }
+
+    if (isRepeatableDirective(directiveName)) {
+      directiveState[directiveName] = {
+        enabled: true,
+        values: [...directiveState[directiveName].values, directiveValue],
+      };
+      continue;
+    }
+
+    if (schemaDirective.kind === 'boolean') {
+      directiveState[directiveName] = {
+        enabled: true,
+        values: [normalizeBooleanValue(directiveValue)],
+      };
+      continue;
+    }
+
+    directiveState[directiveName] = {
+      enabled: true,
+      values: [directiveValue],
+    };
+  }
+
+  return directiveState;
+}
+
+function serializeConfigContent(
+  formState: FormState,
+  schema: SmartdnsConfigSchemaDirective[]
+): string {
+  const lines: string[] = [
+    '# Generated by SmartDNS WebUI form mode.',
+    '# 表单模式会按当前启用的参数重新生成配置内容。',
+    '',
+  ];
+
+  for (const directive of schema) {
+    const directiveValue = formState[directive.name];
+    if (!directiveValue?.enabled) {
+      continue;
+    }
+
+    if (isRepeatableDirective(directive.name)) {
+      for (const value of directiveValue.values.map((item) => item.trim()).filter(Boolean)) {
+        lines.push(`${directive.name} ${value}`);
+      }
+      continue;
+    }
+
+    if (directive.kind === 'boolean') {
+      lines.push(`${directive.name} ${normalizeBooleanValue(directiveValue.values[0])}`);
+      continue;
+    }
+
+    const firstValue = (directiveValue.values[0] ?? '').trim();
+    if (!firstValue) {
+      continue;
+    }
+
+    lines.push(`${directive.name} ${firstValue}`);
+  }
+
+  return `${lines.join('\n').trimEnd()}\n`;
+}
+
+function matchesSearch(directive: SmartdnsConfigSchemaDirective, keyword: string): boolean {
+  if (!keyword) {
+    return true;
+  }
+
+  const normalizedKeyword = keyword.toLowerCase();
+  return (
+    directive.name.toLowerCase().includes(normalizedKeyword) ||
+    directive.kind.toLowerCase().includes(normalizedKeyword) ||
+    directive.source_macro.toLowerCase().includes(normalizedKeyword)
+  );
 }
 
 function getDirectiveKindLabel(kind: string): string {
   switch (kind) {
     case 'boolean': {
-      return '布尔';
+      return '开关';
     }
     case 'integer': {
       return '整数';
@@ -263,10 +506,10 @@ function getDirectiveKindLabel(kind: string): string {
       return '尺寸';
     }
     case 'enum': {
-      return '枚举';
+      return '下拉';
     }
     case 'string': {
-      return '字符串';
+      return '文本';
     }
     case 'custom': {
       return '自定义';
@@ -277,17 +520,24 @@ function getDirectiveKindLabel(kind: string): string {
   }
 }
 
-function matchesSearch(directive: SmartdnsConfigSchemaDirective, keyword: string): boolean {
-  if (!keyword) {
-    return true;
+function getDirectiveControlLabel(directive: SmartdnsConfigSchemaDirective): string {
+  if (isRepeatableDirective(directive.name)) {
+    return '多值输入';
   }
 
-  const normalized = keyword.toLowerCase();
-  return (
-    directive.name.toLowerCase().includes(normalized) ||
-    directive.kind.toLowerCase().includes(normalized) ||
-    directive.source_macro.toLowerCase().includes(normalized)
-  );
+  if (directive.kind === 'boolean') {
+    return '滑动开关';
+  }
+
+  if (isSelectDirective(directive.name, directive.kind)) {
+    return '下拉选项';
+  }
+
+  if (directive.kind === 'integer') {
+    return '数字输入';
+  }
+
+  return '文本输入';
 }
 
 async function parseErrorMessage(response: Response): Promise<string> {
@@ -306,42 +556,21 @@ async function parseErrorMessage(response: Response): Promise<string> {
   }
 }
 
-function insertDirectiveTemplate(
-  currentContent: string,
-  directiveTemplate: string,
-  editor: HTMLTextAreaElement | null
-): { nextContent: string; caretPosition: number } {
-  const selectionStart = editor?.selectionStart ?? currentContent.length;
-  const selectionEnd = editor?.selectionEnd ?? currentContent.length;
-  const before = currentContent.slice(0, selectionStart);
-  const after = currentContent.slice(selectionEnd);
-  const needsLeadingBreak = before.length > 0 && !before.endsWith('\n');
-  const needsTrailingBreak = after.length > 0 && !after.startsWith('\n');
-  const insertion = `${needsLeadingBreak ? '\n' : ''}${directiveTemplate}${
-    needsTrailingBreak ? '\n' : ''
-  }`;
-
-  return {
-    nextContent: `${before}${insertion}${after}`,
-    caretPosition: before.length + insertion.length,
-  };
-}
-
 export function SmartdnsConfigForm(): React.JSX.Element {
   const { t } = useTranslation();
   const { checkSessionError } = useUser();
-  const editorRef = React.useRef<HTMLTextAreaElement | null>(null);
 
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
   const [isRestarting, setIsRestarting] = React.useState(false);
   const [filePath, setFilePath] = React.useState('');
-  const [content, setContent] = React.useState('');
-  const [originalContent, setOriginalContent] = React.useState('');
   const [schema, setSchema] = React.useState<SmartdnsConfigSchemaDirective[]>([]);
+  const [formState, setFormState] = React.useState<FormState>({});
+  const [originalFormState, setOriginalFormState] = React.useState<FormState>({});
   const [selectedCategory, setSelectedCategory] = React.useState('basic');
   const [search, setSearch] = React.useState('');
   const [notice, setNotice] = React.useState<NoticeState>(null);
+  const [showPreview, setShowPreview] = React.useState(false);
 
   const apiFetch = React.useCallback(
     async <T,>(path: string, init?: RequestInit): Promise<{ data?: T; error?: string }> => {
@@ -398,19 +627,25 @@ export function SmartdnsConfigForm(): React.JSX.Element {
       return;
     }
 
-    const fileData = fileResponse.data;
-    const schemaData = schemaResponse.data;
+    const nextSchema = [...(schemaResponse.data?.directives ?? [])].toSorted((left, right) =>
+      left.name.localeCompare(right.name)
+    );
+    const nextFormState = parseConfigContent(fileResponse.data?.content ?? '', nextSchema);
 
-    setFilePath(fileData?.path ?? schemaData?.path ?? '');
-    setContent(fileData?.content ?? '');
-    setOriginalContent(fileData?.content ?? '');
-    setSchema((schemaData?.directives ?? []).toSorted((left, right) => left.name.localeCompare(right.name)));
+    setFilePath(fileResponse.data?.path ?? schemaResponse.data?.path ?? '');
+    setSchema(nextSchema);
+    setFormState(nextFormState);
+    setOriginalFormState(cloneFormState(nextFormState));
     setIsLoading(false);
   }, [apiFetch]);
 
   React.useEffect(() => {
     void loadConfig();
   }, [loadConfig]);
+
+  const generatedContent = React.useMemo(() => {
+    return serializeConfigContent(formState, schema);
+  }, [formState, schema]);
 
   const categorySummaries = React.useMemo<DirectiveCategorySummary[]>(() => {
     return CATEGORY_DEFINITIONS.map((category) => ({
@@ -424,55 +659,113 @@ export function SmartdnsConfigForm(): React.JSX.Element {
 
   const currentCategory =
     categorySummaries.find((category) => category.id === selectedCategory) ?? categorySummaries[0];
-  const isDirty = content !== originalContent;
+  const enabledDirectiveCount = Object.values(formState).filter((directive) => directive.enabled).length;
   const totalVisibleDirectives = categorySummaries.reduce(
     (count, category) => count + category.directives.length,
     0
   );
+  const isDirty = JSON.stringify(formState) !== JSON.stringify(originalFormState);
 
-  const insertTemplate = React.useCallback((directive: SmartdnsConfigSchemaDirective): void => {
-    const template = buildDirectiveTemplate(directive);
-    const { caretPosition, nextContent } = insertDirectiveTemplate(
-      content,
-      template,
-      editorRef.current
-    );
+  const updateDirectiveEnabled = React.useCallback(
+    (directive: SmartdnsConfigSchemaDirective, enabled: boolean): void => {
+      setFormState((previousState) => {
+        const currentState = previousState[directive.name] ?? getDefaultDirectiveState(directive);
+        const nextValues =
+          enabled && isRepeatableDirective(directive.name) && currentState.values.length === 0
+            ? ['']
+            : [...currentState.values];
 
-    setContent(nextContent);
-    setNotice({
-      severity: 'info',
-      message: t('已在当前光标位置插入指令模板。'),
+        return {
+          ...previousState,
+          [directive.name]: {
+            enabled,
+            values: nextValues,
+          },
+        };
+      });
+    },
+    []
+  );
+
+  const updateSingleValue = React.useCallback(
+    (directive: SmartdnsConfigSchemaDirective, value: string): void => {
+      setFormState((previousState) => {
+        const currentState = previousState[directive.name] ?? getDefaultDirectiveState(directive);
+        return {
+          ...previousState,
+          [directive.name]: {
+            enabled: currentState.enabled,
+            values: [value],
+          },
+        };
+      });
+    },
+    []
+  );
+
+  const updateRepeatableValue = React.useCallback(
+    (directive: SmartdnsConfigSchemaDirective, index: number, value: string): void => {
+      setFormState((previousState) => {
+        const currentState = previousState[directive.name] ?? getDefaultDirectiveState(directive);
+        const nextValues = currentState.values.length > 0 ? [...currentState.values] : [''];
+        nextValues[index] = value;
+
+        return {
+          ...previousState,
+          [directive.name]: {
+            enabled: currentState.enabled,
+            values: nextValues,
+          },
+        };
+      });
+    },
+    []
+  );
+
+  const addRepeatableValue = React.useCallback((directive: SmartdnsConfigSchemaDirective): void => {
+    setFormState((previousState) => {
+      const currentState = previousState[directive.name] ?? getDefaultDirectiveState(directive);
+      return {
+        ...previousState,
+        [directive.name]: {
+          enabled: true,
+          values: [...currentState.values, ''],
+        },
+      };
     });
+  }, []);
 
-    window.requestAnimationFrame(() => {
-      editorRef.current?.focus();
-      editorRef.current?.setSelectionRange(caretPosition, caretPosition);
-    });
-  }, [content, t]);
+  const removeRepeatableValue = React.useCallback(
+    (directive: SmartdnsConfigSchemaDirective, index: number): void => {
+      setFormState((previousState) => {
+        const currentState = previousState[directive.name] ?? getDefaultDirectiveState(directive);
+        const nextValues = [...currentState.values];
+        nextValues.splice(index, 1);
 
-  const copyTemplate = React.useCallback(async (directive: SmartdnsConfigSchemaDirective): Promise<void> => {
-    const template = buildDirectiveTemplate(directive);
+        return {
+          ...previousState,
+          [directive.name]: {
+            enabled: currentState.enabled,
+            values: nextValues,
+          },
+        };
+      });
+    },
+    []
+  );
 
-    try {
-      await navigator.clipboard.writeText(template);
-      setNotice({ severity: 'success', message: t('指令模板已复制到剪贴板。') });
-    } catch {
-      setNotice({ severity: 'error', message: t('复制指令模板失败。') });
-    }
-  }, [t]);
+  const resetForm = React.useCallback((): void => {
+    setFormState(cloneFormState(originalFormState));
+    setNotice({ severity: 'info', message: '已恢复到最近一次加载的配置状态。' });
+  }, [originalFormState]);
 
-  const resetContent = React.useCallback((): void => {
-    setContent(originalContent);
-    setNotice({ severity: 'info', message: t('配置内容已恢复到最近一次加载的状态。') });
-  }, [originalContent, t]);
-
-  const saveContent = React.useCallback(async (): Promise<void> => {
+  const saveForm = React.useCallback(async (): Promise<void> => {
     setIsSaving(true);
     setNotice(null);
 
     const response = await apiFetch<null>('/api/config/smartdns/file', {
       method: 'PUT',
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content: generatedContent }),
     });
 
     setIsSaving(false);
@@ -482,12 +775,12 @@ export function SmartdnsConfigForm(): React.JSX.Element {
       return;
     }
 
-    setOriginalContent(content);
+    setOriginalFormState(cloneFormState(formState));
     setNotice({
       severity: 'success',
-      message: t('配置文件已保存，服务端已保留 .bak 备份。'),
+      message: '表单配置已保存，服务端已保留 .bak 备份。',
     });
-  }, [apiFetch, content, t]);
+  }, [apiFetch, formState, generatedContent]);
 
   const restartServer = React.useCallback(async (): Promise<void> => {
     setIsRestarting(true);
@@ -502,8 +795,139 @@ export function SmartdnsConfigForm(): React.JSX.Element {
       return;
     }
 
-    setNotice({ severity: 'success', message: t('SmartDNS 重启请求已发送。') });
+    setNotice({ severity: 'success', message: 'SmartDNS 重启请求已发送。' });
   }, [checkSessionError, t]);
+
+  const renderDirectiveControl = (directive: SmartdnsConfigSchemaDirective): React.ReactNode => {
+    const directiveState = formState[directive.name] ?? getDefaultDirectiveState(directive);
+    const repeatable = isRepeatableDirective(directive.name);
+    const placeholder = placeholders[directive.name] ?? '';
+    const helperText =
+      helperTexts[directive.name] ??
+      (repeatable
+        ? '支持多条记录，可通过“新增”按钮继续添加。'
+        : directive.kind === 'boolean'
+          ? '启用后可通过滑动开关设置 yes / no。'
+          : directive.kind === 'size'
+            ? '支持填写 128k、1m、1048576 等尺寸值。'
+            : directive.kind === 'integer'
+              ? '请输入数字。'
+              : isSelectDirective(directive.name, directive.kind)
+                ? '请选择一个预设选项。'
+                : '请输入该参数的值。');
+
+    if (repeatable) {
+      const valuesToRender = directiveState.values.length > 0 ? directiveState.values : [''];
+
+      return (
+        <Stack spacing={1.25}>
+          {valuesToRender.map((value, index) => (
+            <Stack key={`${directive.name}-${index}`} direction="row" spacing={1} alignItems="center">
+              <TextField
+                disabled={!directiveState.enabled}
+                fullWidth
+                helperText={index === valuesToRender.length - 1 ? helperText : ' '}
+                label={`${directive.name} #${index + 1}`}
+                onChange={(event) => {
+                  updateRepeatableValue(directive, index, event.target.value);
+                }}
+                placeholder={placeholder}
+                value={value}
+              />
+              <IconButton
+                aria-label="删除"
+                color="error"
+                disabled={!directiveState.enabled}
+                onClick={() => {
+                  removeRepeatableValue(directive, index);
+                }}
+              >
+                <DeleteOutlineOutlinedIcon />
+              </IconButton>
+            </Stack>
+          ))}
+          <Stack direction="row" justifyContent="flex-start">
+            <Button
+              disabled={!directiveState.enabled}
+              onClick={() => {
+                addRepeatableValue(directive);
+              }}
+              size="small"
+              startIcon={<AddOutlinedIcon />}
+              variant="outlined"
+            >
+              新增一项
+            </Button>
+          </Stack>
+        </Stack>
+      );
+    }
+
+    if (directive.kind === 'boolean') {
+      const checked = normalizeBooleanValue(directiveState.values[0]) === 'yes';
+
+      return (
+        <Stack spacing={0.5}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={checked}
+                disabled={!directiveState.enabled}
+                onChange={(_event, nextChecked) => {
+                  updateSingleValue(directive, nextChecked ? 'yes' : 'no');
+                }}
+              />
+            }
+            label={checked ? '已开启' : '已关闭'}
+          />
+          <Typography color="text.secondary" variant="caption">
+            {helperText}
+          </Typography>
+        </Stack>
+      );
+    }
+
+    if (isSelectDirective(directive.name, directive.kind)) {
+      const options = getSelectOptions(directive.name);
+
+      return (
+        <TextField
+          disabled={!directiveState.enabled}
+          fullWidth
+          helperText={helperText}
+          label={directive.name}
+          onChange={(event) => {
+            updateSingleValue(directive, event.target.value);
+          }}
+          select
+          value={directiveState.values[0] ?? ''}
+        >
+          {options.map((option) => (
+            <MenuItem key={option} value={option}>
+              {option}
+            </MenuItem>
+          ))}
+        </TextField>
+      );
+    }
+
+    return (
+      <TextField
+        disabled={!directiveState.enabled}
+        fullWidth
+        helperText={helperText}
+        label={directive.name}
+        multiline={directive.kind === 'custom' && directiveState.enabled && !placeholder}
+        minRows={directive.kind === 'custom' && directiveState.enabled && !placeholder ? 2 : undefined}
+        onChange={(event) => {
+          updateSingleValue(directive, event.target.value);
+        }}
+        placeholder={placeholder}
+        type={directive.kind === 'integer' ? 'number' : 'text'}
+        value={directiveState.values[0] ?? ''}
+      />
+    );
+  };
 
   if (isLoading) {
     return (
@@ -512,7 +936,7 @@ export function SmartdnsConfigForm(): React.JSX.Element {
           <Stack alignItems="center" justifyContent="center" spacing={2} sx={{ minHeight: 280 }}>
             <CircularProgress />
             <Typography color="text.secondary" variant="body2">
-              {t('正在加载配置页面...')}
+              正在加载 SmartDNS 表单配置页面...
             </Typography>
           </Stack>
         </CardContent>
@@ -524,10 +948,8 @@ export function SmartdnsConfigForm(): React.JSX.Element {
     <Stack spacing={3}>
       <Card>
         <CardHeader
-          subheader={t(
-            '可直接编辑 smartdns.conf，按分类浏览全部支持的参数，并通过清晰分区快速完成配置。'
-          )}
-          title={t('SmartDNS 配置')}
+          subheader="当前页面采用表单化配置方式。每个参数都可以通过勾选启用、滑动开关、下拉框、输入框或多行输入的形式进行设置。"
+          title="SmartDNS 配置"
         />
         <Divider />
         <CardContent>
@@ -543,12 +965,12 @@ export function SmartdnsConfigForm(): React.JSX.Element {
             >
               <TextField
                 fullWidth
-                helperText={t('可按指令名、参数类型或来源宏进行筛选。')}
-                label={t('搜索指令')}
+                helperText="可按参数名、参数类型或来源宏进行筛选。"
+                label="搜索参数"
                 onChange={(event) => {
                   setSearch(event.target.value);
                 }}
-                placeholder={t('输入指令名或类型关键字')}
+                placeholder="输入参数名或类型关键字"
                 value={search}
               />
 
@@ -569,8 +991,8 @@ export function SmartdnsConfigForm(): React.JSX.Element {
                         selected={selectedCategory === category.id}
                       >
                         <ListItemText
-                          primary={t(category.title)}
-                          secondary={t(category.description)}
+                          primary={category.title}
+                          secondary={category.description}
                           primaryTypographyProps={{ variant: 'subtitle2' }}
                           secondaryTypographyProps={{ variant: 'caption' }}
                         />
@@ -588,9 +1010,7 @@ export function SmartdnsConfigForm(): React.JSX.Element {
               </Paper>
 
               <Alert severity="info">
-                {t(
-                  '本页面用于覆盖 smartdns.conf 的全部参数配置。可先从下方模板库插入指令，再在编辑器中按需调整。'
-                )}
+                这一版设置页以表单为主。多值参数支持新增多行输入，布尔项使用滑动开关，枚举项使用下拉框。
               </Alert>
             </Stack>
 
@@ -599,7 +1019,7 @@ export function SmartdnsConfigForm(): React.JSX.Element {
                 <Stack spacing={1.5}>
                   <Stack spacing={0.75}>
                     <Typography color="text.secondary" variant="overline">
-                      {t('当前编辑文件')}
+                      当前编辑文件
                     </Typography>
                     <Typography
                       sx={{
@@ -613,19 +1033,13 @@ export function SmartdnsConfigForm(): React.JSX.Element {
                     </Typography>
                   </Stack>
                   <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} useFlexGap flexWrap="wrap">
-                    <Chip label={`${t('全部指令')}: ${schema.length}`} variant="outlined" />
-                    <Chip label={`${t('当前可见指令')}: ${totalVisibleDirectives}`} variant="outlined" />
-                    <Chip
-                      label={`${t('当前分类')}: ${t(currentCategory?.title ?? '其他')}`}
-                      variant="outlined"
-                    />
-                    <Chip
-                      label={`${t('模板数量')}: ${currentCategory?.directives.length ?? 0}`}
-                      variant="outlined"
-                    />
+                    <Chip label={`全部参数: ${schema.length}`} variant="outlined" />
+                    <Chip label={`当前分类可见: ${totalVisibleDirectives}`} variant="outlined" />
+                    <Chip label={`当前分类: ${currentCategory?.title ?? '其他'}`} variant="outlined" />
+                    <Chip label={`已启用参数: ${enabledDirectiveCount}`} variant="outlined" />
                     <Chip
                       color={isDirty ? 'warning' : 'success'}
-                      label={isDirty ? t('有未保存修改') : t('已保存')}
+                      label={isDirty ? '有未保存修改' : '已保存'}
                       variant={isDirty ? 'filled' : 'outlined'}
                     />
                   </Stack>
@@ -633,41 +1047,19 @@ export function SmartdnsConfigForm(): React.JSX.Element {
               </Paper>
 
               <Paper sx={{ borderRadius: 2, p: 2 }} variant="outlined">
-                <Stack spacing={2}>
+                <Stack
+                  alignItems={{ xs: 'flex-start', md: 'center' }}
+                  direction={{ xs: 'column', md: 'row' }}
+                  justifyContent="space-between"
+                  spacing={1.5}
+                >
                   <Stack spacing={0.5}>
-                    <Typography variant="h6">{t('配置文件原文编辑器')}</Typography>
+                    <Typography variant="h6">{currentCategory?.title ?? '参数配置'}</Typography>
                     <Typography color="text.secondary" variant="body2">
-                      {t(
-                        '所有 SmartDNS 指令都可以先从模板库插入，再直接在 smartdns.conf 中修改。'
-                      )}
+                      {currentCategory?.description ?? '请选择一个分类后配置对应参数。'}
                     </Typography>
                   </Stack>
-
-                  <TextField
-                    fullWidth
-                    helperText={t(
-                      '原文模式作为最终配置来源，可确保全部参数都能编辑，同时保留复杂规则的灵活性。'
-                    )}
-                    inputRef={editorRef}
-                    label={t('smartdns.conf 原文')}
-                    minRows={24}
-                    multiline
-                    onChange={(event) => {
-                      setContent(event.target.value);
-                    }}
-                    value={content}
-                    sx={{
-                      '& .MuiInputBase-input': {
-                        fontFamily: '"Roboto Mono", monospace',
-                        fontSize: '0.9rem',
-                        lineHeight: 1.65,
-                      },
-                    }}
-                  />
-
-                  {notice ? <Alert severity={notice.severity}>{notice.message}</Alert> : null}
-
-                  <CardActions sx={{ justifyContent: 'flex-end', gap: 1, px: 0 }}>
+                  <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
                     <Button
                       onClick={() => {
                         void loadConfig();
@@ -675,15 +1067,15 @@ export function SmartdnsConfigForm(): React.JSX.Element {
                       startIcon={<RefreshOutlinedIcon />}
                       variant="text"
                     >
-                      {t('重新加载')}
+                      重新加载
                     </Button>
                     <Button
                       disabled={!isDirty || isSaving}
-                      onClick={resetContent}
+                      onClick={resetForm}
                       startIcon={<UndoOutlinedIcon />}
                       variant="text"
                     >
-                      {t('恢复')}
+                      恢复
                     </Button>
                     <Button
                       disabled={isSaving || isRestarting}
@@ -693,101 +1085,128 @@ export function SmartdnsConfigForm(): React.JSX.Element {
                       startIcon={<RestartAltOutlinedIcon />}
                       variant="outlined"
                     >
-                      {isRestarting ? t('正在重启...') : t('重启 SmartDNS')}
+                      {isRestarting ? '正在重启...' : '重启 SmartDNS'}
                     </Button>
                     <Button
                       disabled={!isDirty || isSaving}
                       onClick={() => {
-                        void saveContent();
+                        void saveForm();
                       }}
                       startIcon={<SaveOutlinedIcon />}
                       variant="contained"
                     >
-                      {isSaving ? t('正在保存...') : t('保存配置')}
+                      {isSaving ? '正在保存...' : '保存配置'}
                     </Button>
-                  </CardActions>
+                  </Stack>
                 </Stack>
               </Paper>
+
+              {notice ? <Alert severity={notice.severity}>{notice.message}</Alert> : null}
+
+              <Stack spacing={2}>
+                {currentCategory?.directives.length ? (
+                  currentCategory.directives.map((directive) => {
+                    const directiveState =
+                      formState[directive.name] ?? getDefaultDirectiveState(directive);
+
+                    return (
+                      <Paper key={directive.name} sx={{ borderRadius: 2, p: 2 }} variant="outlined">
+                        <Stack spacing={2}>
+                          <Stack
+                            alignItems={{ xs: 'flex-start', md: 'center' }}
+                            direction={{ xs: 'column', md: 'row' }}
+                            justifyContent="space-between"
+                            spacing={1.5}
+                          >
+                            <Stack spacing={0.75}>
+                              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                                <Typography
+                                  sx={{ fontFamily: '"Roboto Mono", monospace', fontWeight: 700 }}
+                                  variant="subtitle1"
+                                >
+                                  {directive.name}
+                                </Typography>
+                                <Chip label={getDirectiveKindLabel(directive.kind)} size="small" variant="outlined" />
+                                <Chip label={getDirectiveControlLabel(directive)} size="small" variant="outlined" />
+                                <Chip label={directive.source_macro} size="small" variant="outlined" />
+                              </Stack>
+                              <Typography color="text.secondary" variant="body2">
+                                {helperTexts[directive.name] ??
+                                  (isRepeatableDirective(directive.name)
+                                    ? '该参数支持添加多条记录。'
+                                    : directive.kind === 'boolean'
+                                      ? '该参数使用开关控制。'
+                                      : isSelectDirective(directive.name, directive.kind)
+                                        ? '该参数使用下拉框选择。'
+                                        : '该参数使用输入框编辑。')}
+                              </Typography>
+                            </Stack>
+
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  checked={directiveState.enabled}
+                                  onChange={(_event, checked) => {
+                                    updateDirectiveEnabled(directive, checked);
+                                  }}
+                                />
+                              }
+                              label="启用该参数"
+                            />
+                          </Stack>
+
+                          {renderDirectiveControl(directive)}
+                        </Stack>
+                      </Paper>
+                    );
+                  })
+                ) : (
+                  <Alert severity="info">当前分类或搜索条件下没有匹配到参数。</Alert>
+                )}
+              </Stack>
 
               <Paper sx={{ borderRadius: 2, p: 2 }} variant="outlined">
                 <Stack
                   alignItems={{ xs: 'flex-start', md: 'center' }}
                   direction={{ xs: 'column', md: 'row' }}
                   justifyContent="space-between"
-                  spacing={1}
+                  spacing={1.5}
                 >
                   <Stack spacing={0.5}>
-                    <Typography variant="h6">{t(currentCategory?.title ?? '指令模板库')}</Typography>
+                    <Typography variant="h6">生成后的配置预览</Typography>
                     <Typography color="text.secondary" variant="body2">
-                      {t(currentCategory?.description ?? '浏览当前分类中的指令，并插入可直接修改的模板。')}
+                      表单保存时会按当前内容生成 smartdns.conf，可在这里预览最终写入结果。
                     </Typography>
                   </Stack>
-                  <Chip
-                    color="primary"
-                    label={`${currentCategory?.directives.length ?? 0} ${t('个模板')}`}
-                    size="small"
-                    variant="outlined"
+                  <Button
+                    onClick={() => {
+                      setShowPreview((previousState) => !previousState);
+                    }}
+                    startIcon={showPreview ? <VisibilityOffOutlinedIcon /> : <VisibilityOutlinedIcon />}
+                    variant="text"
+                  >
+                    {showPreview ? '隐藏预览' : '显示预览'}
+                  </Button>
+                </Stack>
+
+                <Collapse in={showPreview}>
+                  <TextField
+                    fullWidth
+                    inputProps={{ readOnly: true }}
+                    label="smartdns.conf 预览"
+                    minRows={16}
+                    multiline
+                    sx={{
+                      mt: 2,
+                      '& .MuiInputBase-input': {
+                        fontFamily: '"Roboto Mono", monospace',
+                        fontSize: '0.9rem',
+                        lineHeight: 1.6,
+                      },
+                    }}
+                    value={generatedContent}
                   />
-                </Stack>
-              </Paper>
-
-              <Paper sx={{ borderRadius: 2, p: 2 }} variant="outlined">
-                <Divider sx={{ mb: 2 }} />
-
-                <Stack spacing={1.25} sx={{ maxHeight: 420, overflowY: 'auto', pr: 0.5 }}>
-                  {currentCategory?.directives.length ? (
-                    currentCategory.directives.map((directive) => (
-                      <Paper key={directive.name} sx={{ borderRadius: 2, p: 1.5 }} variant="outlined">
-                        <Stack
-                          alignItems={{ xs: 'flex-start', md: 'center' }}
-                          direction={{ xs: 'column', md: 'row' }}
-                          justifyContent="space-between"
-                          spacing={1.5}
-                        >
-                          <Stack spacing={0.75}>
-                            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                              <Typography
-                                sx={{ fontFamily: '"Roboto Mono", monospace', fontWeight: 600 }}
-                                variant="subtitle2"
-                              >
-                                {directive.name}
-                              </Typography>
-                              <Chip label={t(getDirectiveKindLabel(directive.kind))} size="small" variant="outlined" />
-                              <Chip label={directive.source_macro} size="small" variant="outlined" />
-                            </Stack>
-                            <Typography color="text.secondary" variant="caption">
-                              {t('模板')}: {buildDirectiveTemplate(directive)}
-                            </Typography>
-                          </Stack>
-
-                          <Stack direction="row" spacing={1}>
-                            <Button
-                              onClick={() => {
-                                void copyTemplate(directive);
-                              }}
-                              size="small"
-                              startIcon={<ContentCopyOutlinedIcon />}
-                              variant="text"
-                            >
-                              {t('复制')}
-                            </Button>
-                            <Button
-                              onClick={() => {
-                                insertTemplate(directive);
-                              }}
-                              size="small"
-                              variant="contained"
-                            >
-                              {t('插入')}
-                            </Button>
-                          </Stack>
-                        </Stack>
-                      </Paper>
-                    ))
-                  ) : (
-                    <Alert severity="info">{t('当前分类或搜索条件下没有匹配到可用指令。')}</Alert>
-                  )}
-                </Stack>
+                </Collapse>
               </Paper>
             </Stack>
           </Stack>
