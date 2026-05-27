@@ -21,9 +21,11 @@
 
 ## 安装
 deb包上传至/tmp，执行以下命令（smartdns.9.2026.05.22.amd64-debian-all.deb自行替换）。  
-```cd /tmp
+```
+cd /tmp
 apt install ./smartdns.9.2026.05.22.amd64-debian-all.deb
-systemctl enable smartdns.service --now```
+systemctl enable smartdns.service --now
+```
 
 ## 卸载
-apt purge smartdns -y
+'apt purge smartdns -y'
