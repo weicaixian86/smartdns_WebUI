@@ -14,9 +14,16 @@
 
 - 为 6080 WebUI 增加更完整的设置页
 - 尽量将 `smartdns.conf` 参数表单化
-- 增加中文提示与更紧凑的配置界面
 
 ## 参考
 
 - 上游官方文档：<https://pymumu.github.io/smartdns/>
-- 上游原始说明： [ReadMe.md](ReadMe.md)
+
+## 安装
+deb包上传至/tmp，执行以下命令（smartdns.9.2026.05.22.amd64-debian-all.deb自行替换）。
+cd /tmp
+apt install ./smartdns.9.2026.05.22.amd64-debian-all.deb
+systemctl enable smartdns.service --now
+
+## 卸载
+apt purge smartdns -y
