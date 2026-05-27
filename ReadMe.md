@@ -19,7 +19,7 @@
 
 - 上游官方文档：<https://pymumu.github.io/smartdns/>
 
-## 安装
+## 安装/升级
 deb包上传至/tmp，执行以下命令（smartdns.9.2026.05.22.amd64-debian-all.deb自行替换）。  
 ```
 cd /tmp
@@ -28,4 +28,4 @@ systemctl enable smartdns.service --now
 ```
 
 ## 卸载
-'apt purge smartdns -y'
+`apt purge smartdns -y`
