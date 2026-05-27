@@ -28,4 +28,6 @@ systemctl enable smartdns.service --now
 ```
 
 ## 卸载
-`apt purge smartdns -y`
+```
+apt purge smartdns -y
+```
