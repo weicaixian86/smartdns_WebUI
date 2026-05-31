@@ -1,4 +1,4 @@
-name: Debian 12 amd64 Deb Build
+name: Debian 12 amd64 and Linux Generic Build
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-debian12-deb:
+  build-packages:
     runs-on: ubuntu-latest
     container:
       image: debian:12
@@ -53,14 +53,16 @@ jobs:
           build_date="$(TZ=Asia/Shanghai date +%Y.%m.%d)"
           version="${build_no}.${build_date}"
           deb_name="smartdns.${version}.amd64-debian-all.deb"
-          release_tag="deb-${version}"
-          release_name="SmartDNS Debian 12 amd64 ${version}"
-          release_notes_file="$RUNNER_TEMP/debian12-amd64-release-notes.md"
+          linux_name="smartdns.${version}.x86_64-linux-all.tar.gz"
+          release_tag="packages-${version}"
+          release_name="SmartDNS Debian 12 amd64 and Linux Generic ${version}"
+          release_notes_file="$RUNNER_TEMP/package-release-notes.md"
 
           cat > "$release_notes_file" <<EOF
-          Automated Debian 12 amd64 package release.
+          Automated Debian 12 amd64 and Linux generic package release.
 
-          - Package: \`${deb_name}\`
+          - Debian Package: \`${deb_name}\`
+          - Linux Generic Package: \`${linux_name}\`
           - Build No: \`${build_no}\`
           - Build Date: \`${build_date}\`
           - Source Ref: \`${GITHUB_REF}\`
@@ -71,11 +73,12 @@ jobs:
           echo "build_date=${build_date}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "deb_name=${deb_name}" >> "$GITHUB_OUTPUT"
+          echo "linux_name=${linux_name}" >> "$GITHUB_OUTPUT"
           echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
           echo "release_name=${release_name}" >> "$GITHUB_OUTPUT"
           echo "release_notes_file=${release_notes_file}" >> "$GITHUB_OUTPUT"
 
-      - name: Build Debian 12 amd64 package
+      - name: Build Debian 12 amd64 and Linux generic packages
         shell: bash
         run: |
           mkdir -p dist
@@ -87,17 +90,27 @@ jobs:
             --ver "${{ steps.meta.outputs.version }}" \
             --with-ui \
             --outputdir "$PWD/dist"
+          ./package/build-pkg.sh \
+            --platform linux \
+            --arch x86-64 \
+            --filearch x86_64-linux-all \
+            --ver "${{ steps.meta.outputs.version }}" \
+            --with-ui \
+            --outputdir "$PWD/dist"
           test -f "dist/${{ steps.meta.outputs.deb_name }}"
+          test -f "dist/${{ steps.meta.outputs.linux_name }}"
           ls -lah dist
 
-      - name: Upload Debian package
+      - name: Upload packages
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.meta.outputs.deb_name }}
-          path: dist/${{ steps.meta.outputs.deb_name }}
+          name: smartdns-${{ steps.meta.outputs.version }}-packages
+          path: |
+            dist/${{ steps.meta.outputs.deb_name }}
+            dist/${{ steps.meta.outputs.linux_name }}
           if-no-files-found: error
 
-      - name: Publish Debian package release
+      - name: Publish package release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -105,9 +118,10 @@ jobs:
           RELEASE_NAME: ${{ steps.meta.outputs.release_name }}
           RELEASE_NOTES_FILE: ${{ steps.meta.outputs.release_notes_file }}
           DEB_NAME: ${{ steps.meta.outputs.deb_name }}
+          LINUX_NAME: ${{ steps.meta.outputs.linux_name }}
         run: |
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" "dist/$DEB_NAME" \
+            gh release upload "$RELEASE_TAG" "dist/$DEB_NAME" "dist/$LINUX_NAME" \
               --repo "$GITHUB_REPOSITORY" \
               --clobber
             gh release edit "$RELEASE_TAG" \
@@ -115,7 +129,7 @@ jobs:
               --title "$RELEASE_NAME" \
               --notes-file "$RELEASE_NOTES_FILE"
           else
-            gh release create "$RELEASE_TAG" "dist/$DEB_NAME" \
+            gh release create "$RELEASE_TAG" "dist/$DEB_NAME" "dist/$LINUX_NAME" \
               --repo "$GITHUB_REPOSITORY" \
               --title "$RELEASE_NAME" \
               --notes-file "$RELEASE_NOTES_FILE"
