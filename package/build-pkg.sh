@@ -9,6 +9,8 @@ IS_BUILD_SMARTDNS=1
 OUTPUTDIR=$CURR_DIR
 SMARTDNS_WEBUI_URL="https://github.com/pymumu/smartdns-webui/archive/refs/heads/main.zip"
 SMARTDNS_WEBUI_SOURCE="$WORKDIR/smartdns-webui"
+SMARTDNS_WEBUI_LOCAL_SOURCE="${SMARTDNS_WEBUI_LOCAL_SOURCE:-$CODE_DIR/../smartdns-webui}"
+SMARTDNS_WEBUI_OVERLAY="$CODE_DIR/package/webui-overlay"
 SMARTDNS_STATIC_DIR="$WORKDIR/smartdns-static"
 SMARTDNS_WEBUI_LOCAL_SOURCE="$CODE_DIR/../smartdns-webui"
 SMARTDNS_WEBUI_OVERLAY_DIR="$CODE_DIR/package/webui-overlay"
@@ -265,6 +267,7 @@ build_smartdns()
 
 build_webpages()
 {
+<<<<<<< Updated upstream
 	if [ -d "$SMARTDNS_WEBUI_LOCAL_SOURCE" ] && [ -f "$SMARTDNS_WEBUI_LOCAL_SOURCE/package.json" ]; then
 		echo "Using local smartdns-webui source: $SMARTDNS_WEBUI_LOCAL_SOURCE"
 		SMARTDNS_WEBUI_SOURCE="$SMARTDNS_WEBUI_LOCAL_SOURCE"
@@ -276,6 +279,20 @@ build_webpages()
 				echo "Failed to download smartdns-webui source at $SMARTDNS_WEBUI_URL"
 				return 1
 			fi
+=======
+	if [ ! -d "$SMARTDNS_WEBUI_SOURCE" ] && [ -f "$SMARTDNS_WEBUI_LOCAL_SOURCE/package.json" ]; then
+		echo "Using local smartdns-webui source: $SMARTDNS_WEBUI_LOCAL_SOURCE"
+		rm -fr "$SMARTDNS_WEBUI_SOURCE"
+		cp "$SMARTDNS_WEBUI_LOCAL_SOURCE" "$SMARTDNS_WEBUI_SOURCE" -af
+	fi
+
+	if [ ! -d "$SMARTDNS_WEBUI_SOURCE" ] && [ ! -f "$WORKDIR/smartdns-webui.zip" ]; then
+		echo "smartdns-webui source not found, downloading..."
+		wget -O $WORKDIR/smartdns-webui.zip $SMARTDNS_WEBUI_URL
+		if [ $? -ne 0 ]; then
+			echo "Failed to download smartdns-webui source at $SMARTDNS_WEBUI_URL"
+			return 1
+>>>>>>> Stashed changes
 		fi
 
 		if [ ! -d "$SMARTDNS_WEBUI_SOURCE" ]; then
@@ -296,6 +313,16 @@ build_webpages()
 	if [ ! -d "$SMARTDNS_WEBUI_SOURCE" ]; then
 		echo "smartdns-webui source not found."
 		return 1
+	fi
+
+	if [ -d "$SMARTDNS_WEBUI_OVERLAY" ]; then
+		echo "Applying smartdns-webui overlay: $SMARTDNS_WEBUI_OVERLAY"
+		cp "$SMARTDNS_WEBUI_OVERLAY/." "$SMARTDNS_WEBUI_SOURCE/" -af
+		if [ $? -ne 0 ]; then
+			echo "Failed to apply smartdns-webui overlay."
+			return 1
+		fi
+		rm -fr "$SMARTDNS_WEBUI_SOURCE/out"
 	fi
 
 	if [ ! -f "$SMARTDNS_WEBUI_SOURCE/package.json" ]; then

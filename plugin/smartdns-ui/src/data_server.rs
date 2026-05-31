@@ -50,6 +50,14 @@ pub const MAX_LOG_AGE_VALUE_MIN: u64 = 600;
 pub const MAX_LOG_AGE_VALUE_MAX: u64 = 365 * 24 * 60 * 60 * 10;
 pub const MIN_FREE_DISK_SPACE: u64 = 1024 * 1024 * 8;
 pub const DB_FILE_NAME: &str = "smartdns.db";
+pub const SMARTDNS_CONFIG_FILE_KEY: &str = "smartdns-ui.conf-file";
+pub const SMARTDNS_CONFIG_FILE_DEFAULT: &str = "/etc/smartdns/smartdns.conf";
+
+#[derive(Clone)]
+pub struct SmartdnsConfigFile {
+    pub path: String,
+    pub content: String,
+}
 
 #[derive(Clone)]
 pub struct OverviewData {
@@ -80,7 +88,11 @@ pub struct DataServerConfig {
     pub db_file: String,
     pub data_path: String,
     pub max_log_age_ms: u64,
+<<<<<<< Updated upstream
     pub smartdns_conf_file: String,
+=======
+    pub smartdns_config_file: String,
+>>>>>>> Stashed changes
 }
 
 impl DataServerConfig {
@@ -89,7 +101,11 @@ impl DataServerConfig {
             data_path: Plugin::dns_conf_data_dir(),
             db_file: Plugin::dns_conf_data_dir() + "/" + DB_FILE_NAME,
             max_log_age_ms: DEFAULT_MAX_LOG_AGE_MS,
+<<<<<<< Updated upstream
             smartdns_conf_file: DEFAULT_SMARTDNS_CONF_FILE.to_string(),
+=======
+            smartdns_config_file: SMARTDNS_CONFIG_FILE_DEFAULT.to_string(),
+>>>>>>> Stashed changes
         }
     }
 
@@ -112,6 +128,10 @@ impl DataServerConfig {
                     dns_log!(LogLevel::WARN, "log level is invalid");
                 }
             }
+        }
+
+        if let Some(config_file) = data_server.get_server_config(SMARTDNS_CONFIG_FILE_KEY) {
+            self.smartdns_config_file = config_file;
         }
 
         Ok(())
@@ -370,8 +390,38 @@ impl DataServer {
         conf.clone()
     }
 
+<<<<<<< Updated upstream
     pub fn get_smartdns_conf_file(&self) -> String {
         self.conf.read().unwrap().smartdns_conf_file.clone()
+=======
+    pub fn get_smartdns_config_file_path(&self) -> String {
+        let conf = self.conf.read().unwrap();
+        smartdns_conf_get_conf_fullpath(conf.smartdns_config_file.as_str())
+    }
+
+    pub fn read_smartdns_config_file(&self) -> Result<SmartdnsConfigFile, Box<dyn Error>> {
+        let path = self.get_smartdns_config_file_path();
+        let content = fs::read_to_string(path.as_str())?;
+
+        Ok(SmartdnsConfigFile { path, content })
+    }
+
+    pub fn write_smartdns_config_file(&self, content: &str) -> Result<(), Box<dyn Error>> {
+        let path = self.get_smartdns_config_file_path();
+        let config_path = Path::new(path.as_str());
+
+        if let Some(parent) = config_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        if config_path.exists() {
+            let backup_path = format!("{}.bak", path);
+            fs::copy(config_path, backup_path.as_str())?;
+        }
+
+        fs::write(config_path, content.as_bytes())?;
+        Ok(())
+>>>>>>> Stashed changes
     }
 
     pub fn get_config(&self, key: &str) -> Option<String> {

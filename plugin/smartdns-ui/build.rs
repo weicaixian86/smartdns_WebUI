@@ -100,6 +100,7 @@ fn link_smartdns_lib() {
     }
 }
 
+<<<<<<< Updated upstream
 fn directive_kind_from_macro(macro_name: &str) -> &'static str {
     match macro_name {
         "YESNO" | "YESNO_FUNC" => "boolean",
@@ -175,10 +176,93 @@ fn generate_smartdns_conf_schema() {
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     fs::write(out_path.join("smartdns_conf_schema.rs"), output)
         .expect("Couldn't write smartdns config schema");
+=======
+fn config_kind_from_macro(source_macro: &str) -> &'static str {
+    if source_macro.contains("YESNO") {
+        "boolean"
+    } else if source_macro.contains("ENUM") {
+        "enum"
+    } else if source_macro.contains("SIZE") || source_macro.contains("SSIZE") {
+        "size"
+    } else if source_macro.contains("INT") {
+        "integer"
+    } else if source_macro.contains("STRING") {
+        "string"
+    } else {
+        "custom"
+    }
+}
+
+fn parse_config_directive(line: &str) -> Option<(String, String, String)> {
+    let macro_start = line.find("CONF_")?;
+    let macro_end = line[macro_start..].find('(')? + macro_start;
+    let source_macro = line[macro_start..macro_end].trim();
+
+    if source_macro == "CONF_END" {
+        return None;
+    }
+
+    let args_start = line[macro_end..].find('"')? + macro_end + 1;
+    let args_end = line[args_start..].find('"')? + args_start;
+    let name = line[args_start..args_end].to_string();
+    let kind = config_kind_from_macro(source_macro).to_string();
+
+    Some((name, kind, source_macro.to_string()))
+}
+
+fn generate_smartdns_config_schema() {
+    let curr_source_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let dns_conf_file = format!("{}/../../src/dns_conf/dns_conf.c", curr_source_dir);
+    println!("cargo:rerun-if-changed={}", dns_conf_file);
+
+    let dns_conf_content =
+        fs::read_to_string(dns_conf_file).expect("Unable to read SmartDNS config definitions");
+    let mut directives = Vec::new();
+
+    for line in dns_conf_content.lines() {
+        if let Some(directive) = parse_config_directive(line) {
+            directives.push(directive);
+        }
+    }
+
+    directives.extend([
+        ("smartdns-ui.conf-file".to_string(), "string".to_string(), "PLUGIN_CONFIG".to_string()),
+        ("smartdns-ui.www-root".to_string(), "string".to_string(), "PLUGIN_CONFIG".to_string()),
+        ("smartdns-ui.ip".to_string(), "string".to_string(), "PLUGIN_CONFIG".to_string()),
+        ("smartdns-ui.token-expire".to_string(), "integer".to_string(), "PLUGIN_CONFIG".to_string()),
+        (
+            "smartdns-ui.max-query-log-age".to_string(),
+            "integer".to_string(),
+            "PLUGIN_CONFIG".to_string(),
+        ),
+        (
+            "smartdns-ui.enable-terminal".to_string(),
+            "boolean".to_string(),
+            "PLUGIN_CONFIG".to_string(),
+        ),
+        ("smartdns-ui.enable-cors".to_string(), "boolean".to_string(), "PLUGIN_CONFIG".to_string()),
+        ("smartdns-ui.user".to_string(), "string".to_string(), "PLUGIN_CONFIG".to_string()),
+        ("smartdns-ui.password".to_string(), "string".to_string(), "PLUGIN_CONFIG".to_string()),
+    ]);
+
+    let mut generated = String::from("pub const SMARTDNS_CONFIG_DIRECTIVES: &[SmartdnsConfigDirective] = &[\n");
+    for (name, kind, source_macro) in directives {
+        generated.push_str(&format!(
+            "    SmartdnsConfigDirective {{ name: {:?}, kind: {:?}, source_macro: {:?} }},\n",
+            name, kind, source_macro
+        ));
+    }
+    generated.push_str("];\n");
+
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    fs::write(out_path.join("smartdns_conf_schema.rs"), generated)
+        .expect("Couldn't write SmartDNS config schema");
+>>>>>>> Stashed changes
 }
 
 fn main() {
     get_git_commit_version();
+    generate_smartdns_config_schema();
     link_smartdns_lib();
     generate_smartdns_conf_schema();
     link_rename_lib();

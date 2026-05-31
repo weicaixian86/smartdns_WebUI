@@ -82,7 +82,11 @@ impl SmartdnsPlugin {
         opts.optopt("i", "ip", "http ip", "IP");
         opts.optopt("r", "www-root", "http www root", "PATH");
         opts.optopt("", "data-dir", "http data dir", "PATH");
+<<<<<<< Updated upstream
         opts.optopt("", "conf-file", "smartdns config file", "PATH");
+=======
+        opts.optopt("", "conf-file", "smartdns config file managed by webui", "PATH");
+>>>>>>> Stashed changes
         opts.optopt("", "token-expire", "http token expire time", "TIME");
         if args.len() <= 0 {
             return Ok(());
@@ -137,6 +141,7 @@ impl SmartdnsPlugin {
             data_conf.data_path = data_dir;
         }
 
+<<<<<<< Updated upstream
         let conf_file = Plugin::dns_conf_plugin_config("smartdns-ui.conf-file");
         if let Some(conf_file) = conf_file {
             data_conf.smartdns_conf_file = smartdns_conf_get_conf_fullpath(&conf_file);
@@ -144,6 +149,10 @@ impl SmartdnsPlugin {
 
         if let Some(conf_file) = matches.opt_str("conf-file") {
             data_conf.smartdns_conf_file = conf_file;
+=======
+        if let Some(conf_file) = matches.opt_str("conf-file") {
+            data_conf.smartdns_config_file = conf_file;
+>>>>>>> Stashed changes
         }
 
         Ok(())

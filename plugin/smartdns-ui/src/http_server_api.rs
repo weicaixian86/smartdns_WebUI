@@ -24,7 +24,11 @@ use crate::http_jwt::*;
 use crate::http_server::*;
 use crate::http_server_stream;
 use crate::smartdns;
+<<<<<<< Updated upstream
 use crate::smartdns_conf;
+=======
+use crate::smartdns_conf::SMARTDNS_CONFIG_DIRECTIVES;
+>>>>>>> Stashed changes
 use crate::smartdns::*;
 use crate::utils;
 use crate::Plugin;
@@ -1009,6 +1013,7 @@ impl API {
         _req: Request<body::Incoming>,
     ) -> Result<Response<Full<Bytes>>, HttpError> {
         let data_server = this.get_data_server();
+<<<<<<< Updated upstream
         let conf_file = data_server.read_smartdns_conf();
         if let Err(e) = conf_file {
             return API::response_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string().as_str());
@@ -1017,6 +1022,25 @@ impl API {
         let (path, content) = conf_file.unwrap();
         let body = api_msg_gen_smartdns_conf_file(path.as_str(), content.as_str());
         API::response_build(StatusCode::OK, body)
+=======
+        let config_file = match data_server.read_smartdns_config_file() {
+            Ok(config_file) => config_file,
+            Err(e) => {
+                return API::response_error(
+                    StatusCode::NOT_FOUND,
+                    format!("Read config file failed: {}", e).as_str(),
+                );
+            }
+        };
+
+        API::response_build(
+            StatusCode::OK,
+            api_msg_gen_smartdns_config_file(
+                config_file.path.as_str(),
+                config_file.content.as_str(),
+            ),
+        )
+>>>>>>> Stashed changes
     }
 
     async fn api_config_smartdns_set_file(
@@ -1024,6 +1048,7 @@ impl API {
         _param: APIRouteParam,
         req: Request<body::Incoming>,
     ) -> Result<Response<Full<Bytes>>, HttpError> {
+<<<<<<< Updated upstream
         let data_server = this.get_data_server();
         let whole_body = String::from_utf8(req.into_body().collect().await?.to_bytes().into())?;
         let content = api_msg_parse_smartdns_conf_file_content(whole_body.as_str());
@@ -1034,6 +1059,22 @@ impl API {
         let ret = data_server.write_smartdns_conf(content.unwrap().as_str());
         if let Err(e) = ret {
             return API::response_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string().as_str());
+=======
+        let whole_body = String::from_utf8(req.into_body().collect().await?.to_bytes().into())?;
+        let update = match api_msg_parse_smartdns_config_file_update(whole_body.as_str()) {
+            Ok(update) => update,
+            Err(e) => {
+                return API::response_error(StatusCode::BAD_REQUEST, e.to_string().as_str());
+            }
+        };
+
+        let data_server = this.get_data_server();
+        if let Err(e) = data_server.write_smartdns_config_file(update.content.as_str()) {
+            return API::response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Write config file failed: {}", e).as_str(),
+            );
+>>>>>>> Stashed changes
         }
 
         API::response_build(StatusCode::NO_CONTENT, "".to_string())
@@ -1044,10 +1085,22 @@ impl API {
         _param: APIRouteParam,
         _req: Request<body::Incoming>,
     ) -> Result<Response<Full<Bytes>>, HttpError> {
+<<<<<<< Updated upstream
         let directives = smartdns_conf::get_all_smartdns_config_schema();
         let path = this.get_data_server().get_smartdns_conf_file();
         let body = api_msg_gen_smartdns_conf_schema(path.as_str(), directives.as_slice());
         API::response_build(StatusCode::OK, body)
+=======
+        let data_server = this.get_data_server();
+        let config_path = data_server.get_smartdns_config_file_path();
+        API::response_build(
+            StatusCode::OK,
+            api_msg_gen_smartdns_config_schema(
+                config_path.as_str(),
+                SMARTDNS_CONFIG_DIRECTIVES,
+            ),
+        )
+>>>>>>> Stashed changes
     }
 
     async fn api_stats_get_top_client(
