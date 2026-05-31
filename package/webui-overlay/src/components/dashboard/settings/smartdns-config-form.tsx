@@ -224,10 +224,7 @@ const directiveCategoryMap = new Map<string, string>([
   ['force-no-CNAME', 'advanced'],
   ['force-qtype-SOA', 'advanced'],
   ['dnsmasq-lease-file', 'advanced'],
-<<<<<<< Updated upstream
-=======
   ['odhcpd-lease-file', 'advanced'],
->>>>>>> Stashed changes
   ['hosts-file', 'advanced'],
   ['acl-enable', 'advanced'],
   ['plugin', 'advanced'],
@@ -324,10 +321,7 @@ const placeholders: Record<string, string> = {
   'log-file': '例如 /var/log/smartdns/smartdns.log',
   'audit-file': '例如 /var/log/smartdns/smartdns-audit.log',
   'dnsmasq-lease-file': '例如 /var/lib/misc/dnsmasq.leases',
-<<<<<<< Updated upstream
-=======
   'odhcpd-lease-file': '例如 /tmp/hosts/odhcpd',
->>>>>>> Stashed changes
   'hosts-file': '例如 /etc/hosts',
   'ca-file': '例如 /etc/ssl/certs/ca-certificates.crt',
   'ca-path': '例如 /etc/ssl/certs',
@@ -521,10 +515,7 @@ const directiveOrderByCategory: Record<string, string[]> = {
     'force-no-CNAME',
     'force-qtype-SOA',
     'dnsmasq-lease-file',
-<<<<<<< Updated upstream
-=======
     'odhcpd-lease-file',
->>>>>>> Stashed changes
     'hosts-file',
     'acl-enable',
     'bind-cert-root-key-file',
@@ -649,10 +640,7 @@ const directiveLabels: Record<string, string> = {
   'force-no-CNAME': '禁止 CNAME',
   'force-qtype-SOA': '强制指定类型返回 SOA',
   'dnsmasq-lease-file': 'Dnsmasq 租约文件',
-<<<<<<< Updated upstream
-=======
   'odhcpd-lease-file': 'Odhcpd 租约文件',
->>>>>>> Stashed changes
   'hosts-file': 'Hosts 文件',
   'acl-enable': 'ACL 开关',
   plugin: '插件列表',

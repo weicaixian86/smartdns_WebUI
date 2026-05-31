@@ -12,8 +12,6 @@ SMARTDNS_WEBUI_SOURCE="$WORKDIR/smartdns-webui"
 SMARTDNS_WEBUI_LOCAL_SOURCE="${SMARTDNS_WEBUI_LOCAL_SOURCE:-$CODE_DIR/../smartdns-webui}"
 SMARTDNS_WEBUI_OVERLAY="$CODE_DIR/package/webui-overlay"
 SMARTDNS_STATIC_DIR="$WORKDIR/smartdns-static"
-SMARTDNS_WEBUI_LOCAL_SOURCE="$CODE_DIR/../smartdns-webui"
-SMARTDNS_WEBUI_OVERLAY_DIR="$CODE_DIR/package/webui-overlay"
 SMARTDNS_WITH_LIBS=0
 MAKE_NJOBS=1
 
@@ -267,42 +265,28 @@ build_smartdns()
 
 build_webpages()
 {
-<<<<<<< Updated upstream
-	if [ -d "$SMARTDNS_WEBUI_LOCAL_SOURCE" ] && [ -f "$SMARTDNS_WEBUI_LOCAL_SOURCE/package.json" ]; then
-		echo "Using local smartdns-webui source: $SMARTDNS_WEBUI_LOCAL_SOURCE"
-		SMARTDNS_WEBUI_SOURCE="$SMARTDNS_WEBUI_LOCAL_SOURCE"
-	else
-		if [ ! -f "$WORKDIR/smartdns-webui.zip" ]; then
-			echo "smartdns-webui source not found, downloading..."
-			wget -O $WORKDIR/smartdns-webui.zip $SMARTDNS_WEBUI_URL
-			if [ $? -ne 0 ]; then
-				echo "Failed to download smartdns-webui source at $SMARTDNS_WEBUI_URL"
-				return 1
-			fi
-=======
 	if [ ! -d "$SMARTDNS_WEBUI_SOURCE" ] && [ -f "$SMARTDNS_WEBUI_LOCAL_SOURCE/package.json" ]; then
 		echo "Using local smartdns-webui source: $SMARTDNS_WEBUI_LOCAL_SOURCE"
 		rm -fr "$SMARTDNS_WEBUI_SOURCE"
-		cp "$SMARTDNS_WEBUI_LOCAL_SOURCE" "$SMARTDNS_WEBUI_SOURCE" -af
+		cp -af "$SMARTDNS_WEBUI_LOCAL_SOURCE" "$SMARTDNS_WEBUI_SOURCE"
 	fi
 
 	if [ ! -d "$SMARTDNS_WEBUI_SOURCE" ] && [ ! -f "$WORKDIR/smartdns-webui.zip" ]; then
 		echo "smartdns-webui source not found, downloading..."
-		wget -O $WORKDIR/smartdns-webui.zip $SMARTDNS_WEBUI_URL
+		wget -O "$WORKDIR/smartdns-webui.zip" "$SMARTDNS_WEBUI_URL"
 		if [ $? -ne 0 ]; then
 			echo "Failed to download smartdns-webui source at $SMARTDNS_WEBUI_URL"
 			return 1
->>>>>>> Stashed changes
 		fi
 
 		if [ ! -d "$SMARTDNS_WEBUI_SOURCE" ]; then
 			echo "smartdns-webui source not found, unzipping..."
-			unzip -q $WORKDIR/smartdns-webui.zip -d $WORKDIR
+			unzip -q "$WORKDIR/smartdns-webui.zip" -d "$WORKDIR"
 			if [ $? -ne 0 ]; then
 				echo "Failed to unzip smartdns-webui source."
 				return 1
 			fi
-			mv $WORKDIR/smartdns-webui-main $SMARTDNS_WEBUI_SOURCE
+			mv "$WORKDIR/smartdns-webui-main" "$SMARTDNS_WEBUI_SOURCE"
 			if [ $? -ne 0 ]; then
 				echo "Failed to rename smartdns-webui directory."
 				return 1
@@ -317,7 +301,7 @@ build_webpages()
 
 	if [ -d "$SMARTDNS_WEBUI_OVERLAY" ]; then
 		echo "Applying smartdns-webui overlay: $SMARTDNS_WEBUI_OVERLAY"
-		cp "$SMARTDNS_WEBUI_OVERLAY/." "$SMARTDNS_WEBUI_SOURCE/" -af
+		cp -af "$SMARTDNS_WEBUI_OVERLAY/." "$SMARTDNS_WEBUI_SOURCE/"
 		if [ $? -ne 0 ]; then
 			echo "Failed to apply smartdns-webui overlay."
 			return 1
@@ -330,29 +314,19 @@ build_webpages()
 		return 1
 	fi
 
-	if [ -d "$SMARTDNS_WEBUI_OVERLAY_DIR" ]; then
-		echo "Applying smartdns-webui overlay from $SMARTDNS_WEBUI_OVERLAY_DIR"
-		cp -af $SMARTDNS_WEBUI_OVERLAY_DIR/. $SMARTDNS_WEBUI_SOURCE/
-		if [ $? -ne 0 ]; then
-			echo "Failed to apply smartdns-webui overlay."
-			return 1
-		fi
-		rm -fr "$SMARTDNS_WEBUI_SOURCE/out"
-	fi
-
 	if [ -f "$SMARTDNS_WEBUI_SOURCE/out/index.html" ]; then
 		echo "smartdns-webui already built, skipping build."
 		return 0
 	fi
 
 	echo "Building smartdns-webui..."
-	npm install --prefix $SMARTDNS_WEBUI_SOURCE
+	npm install --prefix "$SMARTDNS_WEBUI_SOURCE"
 	if [ $? -ne 0 ]; then
 		echo "Failed to install smartdns-webui dependencies."
 		return 1
 	fi
 
-	npm run build --prefix $SMARTDNS_WEBUI_SOURCE
+	npm run build --prefix "$SMARTDNS_WEBUI_SOURCE"
 	if [ $? -ne 0 ]; then
 		echo "Failed to build smartdns-webui."
 		return 1

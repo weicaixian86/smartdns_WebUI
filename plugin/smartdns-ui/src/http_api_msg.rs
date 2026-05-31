@@ -22,7 +22,6 @@ use crate::db::*;
 use crate::smartdns::LogLevel;
 use crate::smartdns_conf::SmartdnsConfigDirectiveSchema;
 use crate::whois::WhoIsInfo;
-use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::error::Error;
@@ -39,55 +38,12 @@ pub struct TokenResponse {
     pub expires_in: String,
 }
 
-<<<<<<< Updated upstream
 #[derive(Debug)]
 pub struct SmartdnsConfigFileResponse {
     pub path: String,
     pub content: String,
 }
 
-=======
-#[derive(Debug, Deserialize)]
-pub struct SmartdnsConfigFileUpdate {
-    pub content: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct SmartdnsConfigDirective {
-    pub name: &'static str,
-    pub kind: &'static str,
-    pub source_macro: &'static str,
-}
-
-pub fn api_msg_gen_smartdns_config_file(path: &str, content: &str) -> String {
-    let json_str = json!({
-        "path": path,
-        "content": content,
-    });
-
-    json_str.to_string()
-}
-
-pub fn api_msg_parse_smartdns_config_file_update(
-    data: &str,
-) -> Result<SmartdnsConfigFileUpdate, Box<dyn Error>> {
-    Ok(serde_json::from_str(data)?)
-}
-
-pub fn api_msg_gen_smartdns_config_schema(
-    path: &str,
-    directives: &[SmartdnsConfigDirective],
-) -> String {
-    let json_str = json!({
-        "path": path,
-        "directive_count": directives.len(),
-        "directives": directives,
-    });
-
-    json_str.to_string()
-}
-
->>>>>>> Stashed changes
 pub fn api_msg_parse_auth(data: &str) -> Result<AuthUser, Box<dyn Error>> {
     let v: serde_json::Value = serde_json::from_str(data)?;
     let username = v["username"].as_str();

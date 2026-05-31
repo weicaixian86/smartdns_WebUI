@@ -1,4 +1,3 @@
-<<<<<<< Updated upstream
 /*************************************************************************
  *
  * Copyright (C) 2018-2025 Ruilin Peng (Nick) <pymumu@gmail.com>.
@@ -83,8 +82,3 @@ pub fn get_all_smartdns_config_schema() -> Vec<SmartdnsConfigDirectiveSchema> {
     directives.extend_from_slice(SMARTDNS_UI_PLUGIN_DIRECTIVE_SCHEMA);
     directives
 }
-=======
-use crate::http_api_msg::SmartdnsConfigDirective;
-
-include!(concat!(env!("OUT_DIR"), "/smartdns_conf_schema.rs"));
->>>>>>> Stashed changes

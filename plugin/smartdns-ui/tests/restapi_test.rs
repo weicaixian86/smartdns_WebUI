@@ -465,7 +465,6 @@ fn test_rest_api_settings() {
 }
 
 #[test]
-<<<<<<< Updated upstream
 fn test_rest_api_smartdns_conf_file() {
     let temp_dir = tempfile::TempDir::with_prefix("smartdns-ui-conf-file-").unwrap();
     let conf_file = temp_dir.path().join("smartdns.conf");
@@ -515,17 +514,6 @@ fn test_rest_api_smartdns_conf_schema() {
     assert!(server.start().is_ok());
 
     let mut client = common::TestClient::new(&server.get_host());
-=======
-fn test_rest_api_smartdns_config_file_and_schema() {
-    let mut server = common::TestServer::new();
-    server.set_log_level(LogLevel::DEBUG);
-    server.add_mock_server_conf("smartdns-ui.conf-file", "smartdns.conf");
-    server.enable_mock_server();
-    assert!(server.start().is_ok());
-
-    let mut client = common::TestClient::new(&server.get_host());
-
->>>>>>> Stashed changes
     let res = client.login("admin", "password");
     assert!(res.is_ok());
 
@@ -533,7 +521,6 @@ fn test_rest_api_smartdns_config_file_and_schema() {
     assert!(c.is_ok());
     let (code, body) = c.unwrap();
     assert_eq!(code, 200);
-<<<<<<< Updated upstream
 
     let schema: serde_json::Value = serde_json::from_str(&body).unwrap();
     assert!(schema["directive_count"].as_u64().unwrap() > 50);
@@ -550,37 +537,9 @@ fn test_rest_api_smartdns_config_file_and_schema() {
     assert!(directives
         .iter()
         .any(|item| item["name"].as_str() == Some("smartdns-ui.password")));
-=======
-    let schema: serde_json::Value = serde_json::from_str(&body).unwrap();
-    assert!(schema["directive_count"].as_u64().unwrap() > 0);
-    assert!(schema["directives"]
-        .as_array()
-        .unwrap()
+    assert!(directives
         .iter()
-        .any(|directive| directive["name"] == "odhcpd-lease-file"));
-
-    let c = client.get("/api/config/smartdns/file");
-    assert!(c.is_ok());
-    let (code, body) = c.unwrap();
-    assert_eq!(code, 200);
-    let file: serde_json::Value = serde_json::from_str(&body).unwrap();
-    assert!(file["path"].as_str().unwrap().ends_with("smartdns.conf"));
-    assert!(file["content"].as_str().unwrap().contains("bind :66603"));
-
-    let next_content = "server-name webui-test\nbind :6053\n";
-    let body = serde_json::json!({ "content": next_content }).to_string();
-    let c = client.put("/api/config/smartdns/file", body.as_str());
-    assert!(c.is_ok());
-    let (code, _) = c.unwrap();
-    assert_eq!(code, 204);
-
-    let c = client.get("/api/config/smartdns/file");
-    assert!(c.is_ok());
-    let (code, body) = c.unwrap();
-    assert_eq!(code, 200);
-    let file: serde_json::Value = serde_json::from_str(&body).unwrap();
-    assert_eq!(file["content"].as_str().unwrap(), next_content);
->>>>>>> Stashed changes
+        .any(|item| item["name"].as_str() == Some("odhcpd-lease-file")));
 }
 
 #[test]
