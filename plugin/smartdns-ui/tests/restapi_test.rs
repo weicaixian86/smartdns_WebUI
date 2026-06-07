@@ -533,6 +533,12 @@ fn test_rest_api_smartdns_conf_schema() {
         .any(|item| item["name"].as_str() == Some("server-https")));
     assert!(directives
         .iter()
+        .any(|item| item["name"].as_str() == Some("bind-http")));
+    assert!(directives
+        .iter()
+        .any(|item| item["name"].as_str() == Some("txt-record")));
+    assert!(directives
+        .iter()
         .any(|item| item["name"].as_str() == Some("conf-file")));
     assert!(directives
         .iter()
